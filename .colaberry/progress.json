@@ -174,21 +174,37 @@
       "criteria": [
         {
           "text": "Given a user is logged into the vault, when they request a new password, then a strong password is generated.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user requests a password of specific length, when the length is invalid, then an error message is displayed.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Generated passwords are logged with a timestamp for audit purposes.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Passwords/UnsupportedPasswordLengthException.cs",
+        "src/Sifra.Vault/Passwords/PasswordGenerationFailedException.cs",
+        "src/Sifra.Vault/Passwords/IRandomIndexSource.cs",
+        "src/Sifra.Vault/Passwords/SecureRandomIndexSource.cs",
+        "src/Sifra.Vault/Passwords/PasswordGenerator.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/PasswordGeneratorTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_ReturnsAPasswordOfTheRequestedLength",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_IncludesAtLeastOneOfEachCharacterClass",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_CalledTwice_ProducesDifferentPasswords",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_WithUnsupportedLength_ThrowsWithAClearErrorMessage",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_WhenTheRandomSourceFails_ThrowsPasswordGenerationFailedException",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_WithAuditLoggerProvided_LogsTheEventWithoutEverLoggingThePasswordValue",
+        "Sifra.Vault.Tests.PasswordGeneratorTests.Generate_WhenLoggingServiceIsUnavailable_PropagatesAClearException"
+      ],
+      "notes": "Deliberate deviation from the literal acceptance text: the audit log records that a password was generated (timestamp, user, requested length) but never the password value itself — logging real secrets would violate the no-secrets-in-logs rule that governs this whole project. Reused AuditLogger (STORY-015) unmodified. PasswordGenerator does not itself enforce authentication (same convention as STORY-002 — a real session/lock gate is STORY-004/005's job). Length bounds are [8, 128]; strength is guaranteed inclusion of lowercase/uppercase/digit/symbol via a crypto-random Fisher-Yates shuffle, using RandomNumberGenerator.GetInt32 (BCL, already unbiased).",
+      "updated_at": "2026-09-09T18:21:20.222Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

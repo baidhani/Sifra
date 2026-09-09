@@ -3,6 +3,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Passwords;
 using Sifra.Vault.Sync;
 
 // Optional first argument overrides where vault data lives — useful for
@@ -114,6 +115,22 @@ Console.WriteLine($"Search for \"git\" found {searchResults.Count} result(s): {s
 
 credentials.Delete(credentialId);
 Console.WriteLine($"Deleted credential. List now shows {credentials.List(vaultCredential).Count} item(s).");
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-003: generate strong passwords ---");
+
+var passwordGenerator = new PasswordGenerator(auditLogger: auditLogger);
+var generatedPassword = passwordGenerator.Generate(16);
+Console.WriteLine($"Generated a {generatedPassword.Length}-character password (value withheld from this log, never persisted to the audit trail).");
+
+try
+{
+    passwordGenerator.Generate(3); // below PasswordGenerator.MinLength
+}
+catch (UnsupportedPasswordLengthException ex)
+{
+    Console.WriteLine($"Invalid length correctly rejected: {ex.Message}");
+}
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
