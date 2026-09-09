@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 2,
+    "stories_verified": 3,
     "stories_submitted": 0,
-    "stories_in_progress": 14,
+    "stories_in_progress": 13,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 8,
-    "points_awarded": 765
+    "criteria_passed": 11,
+    "points_awarded": 815
   },
   "stories": [
     {
@@ -558,19 +558,15 @@
       "notes": "Vault authentication (VaultAuthenticator/VaultAccessCredentialStore) has no reference to ICloudAuthProvider or any cloud state — structural separation, not just tested behavior. Cloud auth modeled behind ICloudAuthProvider with a local fake (LocalFakeCloudAuthProvider) since no real cloud provider is integrated yet (that is STORY-007); swapping in a real provider later requires no change to vault auth code. Vault and cloud access are logged to two separate files (vault-access.log / cloud-access.log), not a shared log with a tag.",
       "updated_at": "2026-09-09T17:18:57.484Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a user is logged into cloud storage, when they access the vault, then they must authenticate separately for the vault.",
-          "Given a user logs out of cloud storage, when they access the vault, then they must authenticate for the vault.",
-          "Trust: Vault access is logged independently of cloud storage access."
-        ]
+        "verified_at": "2026-09-09T17:19:26.347Z",
+        "commit_sha": "b12d1e98dae06ab5faf29fd6316ffacd113ec58b",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/b12d1e98dae06ab5faf29fd6316ffacd113ec58b",
+        "commit_at": "2026-09-09T17:19:20Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
