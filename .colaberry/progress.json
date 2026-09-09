@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 7,
+    "stories_verified": 8,
     "stories_submitted": 0,
-    "stories_in_progress": 9,
+    "stories_in_progress": 8,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 23,
-    "points_awarded": 1015
+    "criteria_passed": 26,
+    "points_awarded": 1065
   },
   "stories": [
     {
@@ -256,19 +256,15 @@
       "notes": "VaultSession is a new, self-contained layer that reuses VaultAuthenticator (STORY-013) and bridges to CredentialService (STORY-002) via RequireUnlockedCredential() without modifying either file. A fresh session always starts Locked by construction — this is structural (new in-memory object), not a persisted flag, since unlocked state is runtime-only and should never be written to disk. Known hardening gap, documented in code: the unlocked credential is held as a plain string for the session's lifetime because CredentialService's API takes the credential as a string per call; .NET strings cannot be reliably zeroed from memory. Moving to derived key material would require changing CredentialService's signature — left for a future hardening pass. \"Data corruption\" failure path reuses STORY-002's VaultDecryptionFailedException (AES-GCM auth-tag check) rather than adding new corruption-handling code. \"Crash during unlock\" is modeled as an exception interrupting the read Unlock() depends on; Unlock() performs no writes, so a real crash there cannot corrupt persisted data.",
       "updated_at": "2026-09-09T18:28:54.208Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a user has locked the vault, when they unlock it, then all credentials should be accessible.",
-          "Given a user closes the application, when they reopen it, then the vault should be in a locked state.",
-          "Trust: Vault data is encrypted and persists without loss on close/reopen."
-        ]
+        "verified_at": "2026-09-09T18:29:30.803Z",
+        "commit_sha": "797633a7da7382f2eb2f421094eb789cacf1f5c3",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/797633a7da7382f2eb2f421094eb789cacf1f5c3",
+        "commit_at": "2026-09-09T18:29:20Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
