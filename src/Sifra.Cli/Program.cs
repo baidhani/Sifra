@@ -4,6 +4,7 @@ using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Passwords;
+using Sifra.Vault.Session;
 using Sifra.Vault.Sync;
 
 // Optional first argument overrides where vault data lives — useful for
@@ -131,6 +132,31 @@ catch (UnsupportedPasswordLengthException ex)
 {
     Console.WriteLine($"Invalid length correctly rejected: {ex.Message}");
 }
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-004: lock and unlock vault ---");
+
+var freshSession = new VaultSession(vaultAuth); // simulates a freshly (re)opened application
+Console.WriteLine($"On (re)open: {freshSession.State} — must unlock before credentials are accessible.");
+
+try
+{
+    freshSession.RequireUnlockedCredential();
+}
+catch (VaultLockedException ex)
+{
+    Console.WriteLine($"Access while locked correctly refused: {ex.Message}");
+}
+
+Console.WriteLine($"Unlock with wrong password: {freshSession.Unlock("not-the-password")} (state stays {freshSession.State})");
+
+var secondCredentialId = credentials.Add("demo-password", "Gmail", "firas", "hunter3", "https://gmail.com");
+Console.WriteLine($"Unlock with correct password: {freshSession.Unlock("demo-password")} (state now {freshSession.State})");
+Console.WriteLine($"All credentials accessible after unlock: {credentials.List(freshSession.RequireUnlockedCredential()).Count} item(s).");
+
+freshSession.Lock();
+Console.WriteLine($"Locked again: {freshSession.State}.");
+credentials.Delete(secondCredentialId); // tidy up so later demo sections still show one credential's worth of behavior consistently
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");

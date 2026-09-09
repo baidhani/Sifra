@@ -224,21 +224,37 @@
       "criteria": [
         {
           "text": "Given a user has locked the vault, when they unlock it, then all credentials should be accessible.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user closes the application, when they reopen it, then the vault should be in a locked state.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Vault data is encrypted and persists without loss on close/reopen.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Session/VaultLockState.cs",
+        "src/Sifra.Vault/Session/VaultLockedException.cs",
+        "src/Sifra.Vault/Session/VaultSession.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/VaultSessionTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.VaultSessionTests.NewSession_StartsLocked",
+        "Sifra.Vault.Tests.VaultSessionTests.RequireUnlockedCredential_WhileLocked_Throws",
+        "Sifra.Vault.Tests.VaultSessionTests.Unlock_WithCorrectCredential_MakesAllCredentialsAccessible",
+        "Sifra.Vault.Tests.VaultSessionTests.Unlock_CalledTwiceWithCorrectCredential_IsIdempotent",
+        "Sifra.Vault.Tests.VaultSessionTests.Lock_ClearsAccessAndRequiresUnlockingAgain",
+        "Sifra.Vault.Tests.VaultSessionTests.Unlock_WithWrongCredential_StaysLockedAndReturnsFalse",
+        "Sifra.Vault.Tests.VaultSessionTests.ReopeningTheApplication_StartsLockedButPersistedCredentialsSurviveIntact",
+        "Sifra.Vault.Tests.VaultSessionTests.GetById_WhenStoredCiphertextIsCorrupted_ThrowsInsteadOfReturningGarbage",
+        "Sifra.Vault.Tests.VaultSessionTests.Unlock_WhenTheUnderlyingStoreFails_PropagatesAndNeverTransitionsToUnlocked"
+      ],
+      "notes": "VaultSession is a new, self-contained layer that reuses VaultAuthenticator (STORY-013) and bridges to CredentialService (STORY-002) via RequireUnlockedCredential() without modifying either file. A fresh session always starts Locked by construction — this is structural (new in-memory object), not a persisted flag, since unlocked state is runtime-only and should never be written to disk. Known hardening gap, documented in code: the unlocked credential is held as a plain string for the session's lifetime because CredentialService's API takes the credential as a string per call; .NET strings cannot be reliably zeroed from memory. Moving to derived key material would require changing CredentialService's signature — left for a future hardening pass. \"Data corruption\" failure path reuses STORY-002's VaultDecryptionFailedException (AES-GCM auth-tag check) rather than adding new corruption-handling code. \"Crash during unlock\" is modeled as an exception interrupting the read Unlock() depends on; Unlock() performs no writes, so a real crash there cannot corrupt persisted data.",
+      "updated_at": "2026-09-09T18:28:54.208Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
