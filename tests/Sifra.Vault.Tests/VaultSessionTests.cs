@@ -29,7 +29,7 @@ public sealed class VaultSessionTests : IDisposable
 
     private CredentialService CreateCredentialService() => new(
         new CredentialStore(_dataDirectory),
-        new VaultEncryptionService(new VaultEncryptionKeyStore(_dataDirectory)),
+        new VaultEncryptionService(new VaultMasterKeyStore(_dataDirectory)),
         new FakeCredentialClipboard());
 
     [Fact]
@@ -146,8 +146,17 @@ public sealed class VaultSessionTests : IDisposable
         var credentialService = CreateCredentialService();
         var id = credentialService.Add(MasterPassword, "GitHub", "firas", "hunter2", "https://github.com");
 
+        // Flip one character inside the encrypted password value
+        // deterministically — a blind global string replace is flaky
+        // (the random ciphertext may not happen to contain that
+        // character on a given run) and could corrupt JSON structure
+        // instead of the ciphertext.
         var filePath = Path.Combine(_dataDirectory, "credentials.json");
-        var corrupted = File.ReadAllText(filePath).Replace("A", "B"); // tamper with the ciphertext bytes
+        var original = File.ReadAllText(filePath);
+        const string marker = "\"EncryptedPasswordBase64\":\"";
+        var valueStart = original.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
+        var flipChar = original[valueStart] == 'A' ? 'B' : 'A';
+        var corrupted = original[..valueStart] + flipChar + original[(valueStart + 1)..];
         File.WriteAllText(filePath, corrupted);
 
         var session = new VaultSession(authenticator);

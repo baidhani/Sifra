@@ -26,7 +26,7 @@ public sealed class CredentialServiceTests : IDisposable
 
     private CredentialService CreateService(AuditLogger? auditLogger = null) => new(
         new CredentialStore(_dataDirectory),
-        new VaultEncryptionService(new VaultEncryptionKeyStore(_dataDirectory)),
+        new VaultEncryptionService(new VaultMasterKeyStore(_dataDirectory)),
         _clipboard,
         auditLogger);
 

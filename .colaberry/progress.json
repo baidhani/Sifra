@@ -274,21 +274,42 @@
       "criteria": [
         {
           "text": "Given a user is logged in, when they change their master password, then the password is updated successfully.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user enters an incorrect current password, when attempting to change it, then an error message is displayed.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Password change events are logged with user ID and timestamp.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Crypto/AesGcmCipher.cs",
+        "src/Sifra.Vault/Crypto/VaultMasterKeyRecord.cs",
+        "src/Sifra.Vault/Crypto/VaultMasterKeyStore.cs",
+        "src/Sifra.Vault/Crypto/VaultEncryptionService.cs",
+        "src/Sifra.Vault/Session/IncorrectMasterPasswordException.cs",
+        "src/Sifra.Vault/Session/WeakMasterPasswordException.cs",
+        "src/Sifra.Vault/Session/MasterPasswordService.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/VaultEncryptionServiceTests.cs",
+        "tests/Sifra.Vault.Tests/VaultSessionTests.cs",
+        "tests/Sifra.Vault.Tests/CredentialServiceTests.cs",
+        "tests/Sifra.Vault.Tests/MasterPasswordServiceTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.VaultEncryptionServiceTests.DeriveKey_WithWrongCredentialAfterKeyAlreadyExists_ThrowsVaultDecryptionFailedException",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_WithCorrectCurrentPassword_UpdatesSuccessfully",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_DoesNotReEncryptExistingCredentials_TheyRemainDecryptableUnderTheNewPassword",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_WithIncorrectCurrentPassword_ThrowsAndLeavesPasswordUnchanged",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_WithATooShortNewPassword_ThrowsAndLeavesPasswordUnchanged",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_WithAuditLoggerProvided_LogsTheEventWithoutLoggingEitherPassword",
+        "Sifra.Vault.Tests.MasterPasswordServiceTests.ChangePassword_WhenLoggingServiceIsUnavailable_PropagatesAClearExceptionButHasAlreadyChangedThePassword"
+      ],
+      "notes": "IMPORTANT — retroactive fix to STORY-002: VaultEncryptionService.DeriveKey previously derived the encryption key directly from the vault credential via PBKDF2, which made REQ-008 impossible (changing the password would have made every existing credential permanently undecryptable). Fixed by switching to envelope encryption: a persistent random vault master key (VMK) is wrapped under a password-derived key-encryption-key (KEK); changing the password re-wraps the VMK without touching any credential ciphertext. VaultEncryptionService.DeriveKey/Encrypt/Decrypt public signatures are unchanged, so CredentialService and VaultSession needed zero code changes. Extracted the AES-GCM primitive into AesGcmCipher to avoid duplicating it for key-wrapping; deleted the now-dead VaultEncryptionKeyStore/VaultEncryptionSaltRecord. Updated one STORY-002 test whose assumption was exactly the bug (deriving with a wrong password now fails immediately, not silently). Also fixed an unrelated pre-existing flaky test in VaultSessionTests.cs (corruption via global string replace could miss the target character depending on random ciphertext bytes). Confirmed via test: raw credentials.json is byte-for-byte identical before and after a password change. MasterPasswordService reuses VaultAuthenticator.SetCredential (STORY-013) and AuditLogger (STORY-015) unmodified. Caveat documented in code: a VaultSession already unlocked with the old password becomes stale after a change and must be re-locked/unlocked; not enforced automatically since that would require touching VaultSession.cs (STORY-004).",
+      "updated_at": "2026-09-09T19:08:06.801Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

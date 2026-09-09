@@ -1,81 +1,81 @@
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Sifra.Vault.Crypto;
 
 /// <summary>
-/// Derives the vault's encryption key from the same vault credential used
-/// for authentication (STORY-013), but via a separate persisted salt so
-/// the two derived outputs are cryptographically independent. Encrypts
-/// with AES-GCM (established, authenticated encryption from the BCL — no
-/// new crypto dependency). Reusable by any future story that needs to
-/// encrypt vault content before it leaves the device (e.g. sync).
+/// Encrypts vault content with a persistent, random vault master key
+/// (VMK) — not with a key derived directly from the password. The VMK is
+/// stored wrapped under a key-encryption-key (KEK) derived from the
+/// current vault credential (STORY-013's auth credential). This envelope
+/// design is what makes changing the master password (STORY-005,
+/// REQ-008) a matter of re-wrapping one small key rather than
+/// re-encrypting every credential: the VMK itself never changes, only
+/// how it is wrapped does.
 /// </summary>
 public sealed class VaultEncryptionService
 {
     private const int KeyLengthBytes = 32; // AES-256
-    private const int NonceLengthBytes = 12;
-    private const int TagLengthBytes = 16;
+    private const int KekSaltLengthBytes = 16;
     private const int Pbkdf2Iterations = 210_000; // OWASP current minimum for PBKDF2-SHA256
 
-    private readonly VaultEncryptionKeyStore _keyStore;
+    private readonly VaultMasterKeyStore _masterKeyStore;
 
-    public VaultEncryptionService(VaultEncryptionKeyStore keyStore)
+    public VaultEncryptionService(VaultMasterKeyStore masterKeyStore)
     {
-        _keyStore = keyStore;
+        _masterKeyStore = masterKeyStore;
     }
 
     /// <summary>
-    /// Derives the encryption key for this vault credential. Stable across
-    /// calls and process restarts as long as the persisted salt is
-    /// unchanged — the same credential always yields the same key.
+    /// Returns the vault master key, unwrapped using a KEK derived from
+    /// this vault credential. On first use (no wrapped key persisted yet),
+    /// generates a fresh random VMK and persists it wrapped under this
+    /// credential.
     /// </summary>
+    /// <exception cref="VaultDecryptionFailedException">
+    /// A wrapped key already exists and this credential is wrong — the KEK
+    /// derived from it cannot unwrap the VMK.
+    /// </exception>
     public byte[] DeriveKey(string vaultCredential)
     {
-        var salt = _keyStore.EnsureSalt();
-        return Rfc2898DeriveBytes.Pbkdf2(vaultCredential, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, KeyLengthBytes);
+        var record = _masterKeyStore.Load();
+        if (record is null)
+        {
+            var vmk = RandomNumberGenerator.GetBytes(KeyLengthBytes);
+            PersistWrapped(vmk, vaultCredential);
+            return vmk;
+        }
+
+        var kek = DeriveKek(vaultCredential, Convert.FromBase64String(record.KekSaltBase64));
+        return AesGcmCipher.DecryptBytes(Convert.FromBase64String(record.WrappedKeyBase64), kek);
     }
 
-    /// <returns>Base64 of nonce || tag || ciphertext.</returns>
-    public string Encrypt(string plaintext, byte[] key)
+    /// <summary>
+    /// Re-wraps the existing vault master key under a new credential's KEK.
+    /// The VMK itself is unchanged, so every credential ciphertext already
+    /// on disk remains decryptable — nothing is re-encrypted (REQ-008).
+    /// </summary>
+    /// <exception cref="VaultDecryptionFailedException">The old credential is wrong.</exception>
+    public void RewrapMasterKey(string oldVaultCredential, string newVaultCredential)
     {
-        var nonce = RandomNumberGenerator.GetBytes(NonceLengthBytes);
-        var plaintextBytes = Encoding.UTF8.GetBytes(plaintext);
-        var ciphertext = new byte[plaintextBytes.Length];
-        var tag = new byte[TagLengthBytes];
-
-        using var aesGcm = new AesGcm(key, TagLengthBytes);
-        aesGcm.Encrypt(nonce, plaintextBytes, ciphertext, tag);
-
-        var combined = new byte[NonceLengthBytes + TagLengthBytes + ciphertext.Length];
-        Buffer.BlockCopy(nonce, 0, combined, 0, NonceLengthBytes);
-        Buffer.BlockCopy(tag, 0, combined, NonceLengthBytes, TagLengthBytes);
-        Buffer.BlockCopy(ciphertext, 0, combined, NonceLengthBytes + TagLengthBytes, ciphertext.Length);
-
-        return Convert.ToBase64String(combined);
+        var vmk = DeriveKey(oldVaultCredential); // unwraps with the old credential; also handles the no-key-yet case
+        PersistWrapped(vmk, newVaultCredential);
     }
+
+    public string Encrypt(string plaintext, byte[] key) => AesGcmCipher.Encrypt(plaintext, key);
 
     /// <exception cref="VaultDecryptionFailedException">
     /// The ciphertext could not be authenticated — usually the wrong key (wrong vault credential).
     /// </exception>
-    public string Decrypt(string base64CipherBlob, byte[] key)
+    public string Decrypt(string base64CipherBlob, byte[] key) => AesGcmCipher.Decrypt(base64CipherBlob, key);
+
+    private void PersistWrapped(byte[] vmk, string vaultCredential)
     {
-        var combined = Convert.FromBase64String(base64CipherBlob);
-        var nonce = combined[..NonceLengthBytes];
-        var tag = combined[NonceLengthBytes..(NonceLengthBytes + TagLengthBytes)];
-        var ciphertext = combined[(NonceLengthBytes + TagLengthBytes)..];
-        var plaintextBytes = new byte[ciphertext.Length];
-
-        try
-        {
-            using var aesGcm = new AesGcm(key, TagLengthBytes);
-            aesGcm.Decrypt(nonce, ciphertext, tag, plaintextBytes);
-        }
-        catch (CryptographicException ex)
-        {
-            throw new VaultDecryptionFailedException("Could not decrypt — check the vault credential is correct.", ex);
-        }
-
-        return Encoding.UTF8.GetString(plaintextBytes);
+        var salt = RandomNumberGenerator.GetBytes(KekSaltLengthBytes);
+        var kek = DeriveKek(vaultCredential, salt);
+        var wrapped = AesGcmCipher.EncryptBytes(vmk, kek);
+        _masterKeyStore.Save(new VaultMasterKeyRecord(Convert.ToBase64String(salt), Convert.ToBase64String(wrapped)));
     }
+
+    private static byte[] DeriveKek(string vaultCredential, byte[] salt) =>
+        Rfc2898DeriveBytes.Pbkdf2(vaultCredential, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, KeyLengthBytes);
 }

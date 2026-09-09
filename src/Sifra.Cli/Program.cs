@@ -85,7 +85,7 @@ Console.WriteLine("--- STORY-002: add, view, edit, delete, search credentials + 
 
 var credentials = new CredentialService(
     new CredentialStore(dataDirectory),
-    new VaultEncryptionService(new VaultEncryptionKeyStore(dataDirectory)),
+    new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)),
     new TextCopyCredentialClipboard(),
     auditLogger);
 
@@ -157,6 +157,45 @@ Console.WriteLine($"All credentials accessible after unlock: {credentials.List(f
 freshSession.Lock();
 Console.WriteLine($"Locked again: {freshSession.State}.");
 credentials.Delete(secondCredentialId); // tidy up so later demo sections still show one credential's worth of behavior consistently
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-005: change master password (without re-encrypting credentials) ---");
+
+var thirdCredentialId = credentials.Add("demo-password", "GitHub", "firas", "hunter2", "https://github.com");
+var credentialsFileBeforeChange = File.ReadAllText(Path.Combine(resolvedDataDirectory, "credentials.json"));
+
+var masterPasswordService = new MasterPasswordService(vaultAuth, new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)), auditLogger);
+
+try
+{
+    masterPasswordService.ChangePassword("wrong-current-password", "new-demo-password-123");
+}
+catch (IncorrectMasterPasswordException ex)
+{
+    Console.WriteLine($"Change with wrong current password correctly refused: {ex.Message}");
+}
+
+try
+{
+    masterPasswordService.ChangePassword("demo-password", "short");
+}
+catch (WeakMasterPasswordException ex)
+{
+    Console.WriteLine($"Change to a too-short new password correctly refused: {ex.Message}");
+}
+
+masterPasswordService.ChangePassword("demo-password", "new-demo-password-123");
+Console.WriteLine("Master password changed.");
+Console.WriteLine($"Old password now rejected: {vaultAuth.Authenticate("demo-password")}");
+Console.WriteLine($"New password accepted: {vaultAuth.Authenticate("new-demo-password-123")}");
+
+var credentialsFileAfterChange = File.ReadAllText(Path.Combine(resolvedDataDirectory, "credentials.json"));
+Console.WriteLine($"credentials.json unchanged by the password change (REQ-008 — no re-encryption): {credentialsFileBeforeChange == credentialsFileAfterChange}");
+
+var viewWithNewPassword = credentials.GetById("new-demo-password-123", thirdCredentialId);
+Console.WriteLine($"Existing credential still decrypts correctly under the new password: username=\"{viewWithNewPassword.Username}\"");
+
+credentials.Delete(thirdCredentialId); // tidy up
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
