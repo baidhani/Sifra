@@ -1,6 +1,8 @@
 using Sifra.Vault;
 using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
+using Sifra.Vault.Credentials;
+using Sifra.Vault.Crypto;
 using Sifra.Vault.Sync;
 
 // Optional first argument overrides where vault data lives — useful for
@@ -75,6 +77,43 @@ Console.WriteLine("Reconnecting...");
 syncProvider.IsConnected = true;
 dataService.SyncNow();
 Console.WriteLine($"After sync: {dataService.PendingChanges().Count} pending change(s), {syncProvider.PushedChanges.Count} pushed to the cloud");
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-002: add, view, edit, delete, search credentials + clipboard copy ---");
+
+var credentials = new CredentialService(
+    new CredentialStore(dataDirectory),
+    new VaultEncryptionService(new VaultEncryptionKeyStore(dataDirectory)),
+    new TextCopyCredentialClipboard(),
+    auditLogger);
+
+const string vaultCredential = "demo-password"; // same credential just proven via vaultAuth.Authenticate above
+
+var credentialId = credentials.Add(vaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+Console.WriteLine($"Added credential. List now shows {credentials.List(vaultCredential).Count} item(s).");
+
+var rawCredentialsFile = File.ReadAllText(Path.Combine(resolvedDataDirectory, "credentials.json"));
+Console.WriteLine($"On disk (ciphertext only, no plaintext secrets): {rawCredentialsFile}");
+
+credentials.CopyUsername(vaultCredential, credentialId);
+Console.WriteLine("Copied username to clipboard.");
+credentials.CopyPassword(vaultCredential, credentialId);
+Console.WriteLine("Copied password to clipboard.");
+
+try
+{
+    credentials.CopyUsername(vaultCredential, "does-not-exist");
+}
+catch (CredentialNotFoundException ex)
+{
+    Console.WriteLine($"Copy of a non-existent credential correctly failed: {ex.Message}");
+}
+
+var searchResults = credentials.Search(vaultCredential, "git");
+Console.WriteLine($"Search for \"git\" found {searchResults.Count} result(s): {searchResults[0].Label}");
+
+credentials.Delete(credentialId);
+Console.WriteLine($"Deleted credential. List now shows {credentials.List(vaultCredential).Count} item(s).");
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
