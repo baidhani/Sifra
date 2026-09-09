@@ -525,21 +525,38 @@
       "criteria": [
         {
           "text": "Given a user is logged into cloud storage, when they access the vault, then they must authenticate separately for the vault.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user logs out of cloud storage, when they access the vault, then they must authenticate for the vault.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Vault access is logged independently of cloud storage access.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Auth/ICloudAuthProvider.cs",
+        "src/Sifra.Vault/Auth/CloudAuthenticationException.cs",
+        "src/Sifra.Vault/Auth/LocalFakeCloudAuthProvider.cs",
+        "src/Sifra.Vault/Auth/IAccessAuditLog.cs",
+        "src/Sifra.Vault/Auth/FileAccessAuditLog.cs",
+        "src/Sifra.Vault/Auth/VaultAccessCredentialRecord.cs",
+        "src/Sifra.Vault/Auth/VaultAccessCredentialStore.cs",
+        "src/Sifra.Vault/Auth/VaultAuthenticator.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/VaultAuthenticatorTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.VaultAuthenticatorTests.Authenticate_RegardlessOfCloudSignInState_RequiresItsOwnCredential",
+        "Sifra.Vault.Tests.VaultAuthenticatorTests.Authenticate_WithoutAnyCloudAuthenticationHavingEverHappened_StillSucceeds",
+        "Sifra.Vault.Tests.VaultAuthenticatorTests.Authenticate_WhenCloudAuthenticationFails_VaultAccessIsUnaffected",
+        "Sifra.Vault.Tests.VaultAuthenticatorTests.Authenticate_WithWrongCredential_Fails",
+        "Sifra.Vault.Tests.VaultAuthenticatorTests.VaultAndCloudAccess_AreLoggedToCompletelySeparateLogs"
+      ],
+      "notes": "Vault authentication (VaultAuthenticator/VaultAccessCredentialStore) has no reference to ICloudAuthProvider or any cloud state — structural separation, not just tested behavior. Cloud auth modeled behind ICloudAuthProvider with a local fake (LocalFakeCloudAuthProvider) since no real cloud provider is integrated yet (that is STORY-007); swapping in a real provider later requires no change to vault auth code. Vault and cloud access are logged to two separate files (vault-access.log / cloud-access.log), not a shared log with a tag.",
+      "updated_at": "2026-09-09T17:18:57.484Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,
