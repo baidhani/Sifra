@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Sifra.Vault.Audit;
 
 namespace Sifra.Vault.Auth;
 
@@ -16,11 +17,20 @@ public sealed class VaultAuthenticator
 
     private readonly VaultAccessCredentialStore _store;
     private readonly IAccessAuditLog _auditLog;
+    private readonly AuditLogger? _trustSpineLogger;
 
-    public VaultAuthenticator(VaultAccessCredentialStore store, IAccessAuditLog auditLog)
+    /// <param name="auditLog">The STORY-013 access log, kept separate from cloud access logging.</param>
+    /// <param name="trustSpineLogger">
+    /// Optional (STORY-015). When provided, every completed Authenticate
+    /// call is also logged to the trust-spine audit trail with a unique
+    /// operation id. Null means no trust-spine logging — existing callers
+    /// and tests are unaffected. Never logs the credential itself.
+    /// </param>
+    public VaultAuthenticator(VaultAccessCredentialStore store, IAccessAuditLog auditLog, AuditLogger? trustSpineLogger = null)
     {
         _store = store;
         _auditLog = auditLog;
+        _trustSpineLogger = trustSpineLogger;
     }
 
     /// <summary>
@@ -50,6 +60,7 @@ public sealed class VaultAuthenticator
         if (record is null)
         {
             _auditLog.Record("vault_authenticate", success: false);
+            _trustSpineLogger?.Log(nameof(Authenticate), Environment.UserName, details: "success=false (no credential set)");
             return false;
         }
 
@@ -59,6 +70,7 @@ public sealed class VaultAuthenticator
 
         var success = CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
         _auditLog.Record("vault_authenticate", success);
+        _trustSpineLogger?.Log(nameof(Authenticate), Environment.UserName, details: $"success={success}");
         return success;
     }
 

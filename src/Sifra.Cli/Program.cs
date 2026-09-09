@@ -1,13 +1,19 @@
 using Sifra.Vault;
+using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Sync;
 
 // Optional first argument overrides where vault data lives — useful for
 // demos so they never touch a real user's actual application-data folder.
 string? dataDirectory = args.Length > 0 ? args[0] : null;
+var resolvedDataDirectory = dataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Sifra");
+
+var operationsLogPath = Path.Combine(resolvedDataDirectory, "operations.log");
+var adminAlerts = new LocalFakeAdminAlertSink();
+var auditLogger = new AuditLogger(new FileAuditLogSink(operationsLogPath), adminAlerts);
 
 var store = new VaultStore(dataDirectory);
-var service = new VaultService(store);
+var service = new VaultService(store, auditLogger);
 
 try
 {
@@ -30,11 +36,9 @@ catch (VaultStorageException ex)
 Console.WriteLine();
 Console.WriteLine("--- STORY-013: cloud auth and vault auth are separate ---");
 
-var vaultLogPath = Path.Combine(
-    dataDirectory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Sifra"),
-    "vault-access.log");
+var vaultLogPath = Path.Combine(resolvedDataDirectory, "vault-access.log");
 
-var vaultAuth = new VaultAuthenticator(new VaultAccessCredentialStore(dataDirectory), new FileAccessAuditLog(vaultLogPath));
+var vaultAuth = new VaultAuthenticator(new VaultAccessCredentialStore(dataDirectory), new FileAccessAuditLog(vaultLogPath), auditLogger);
 vaultAuth.SetCredential("demo-password");
 
 var cloud = new LocalFakeCloudAuthProvider();
@@ -51,7 +55,7 @@ Console.WriteLine();
 Console.WriteLine("--- STORY-014: local-first operation with offline usability ---");
 
 var syncProvider = new LocalFakeCloudSyncProvider(); // starts disconnected — offline
-var dataService = new VaultDataService(new VaultDataStore(dataDirectory), new OfflineChangeQueueStore(dataDirectory), syncProvider);
+var dataService = new VaultDataService(new VaultDataStore(dataDirectory), new OfflineChangeQueueStore(dataDirectory), syncProvider, auditLogger);
 
 Console.WriteLine($"Offline (connected={syncProvider.IsConnected}). Editing a vault data item...");
 dataService.Edit(new VaultDataItem("note-1", "buy milk", DateTimeOffset.UtcNow));
@@ -71,3 +75,30 @@ Console.WriteLine("Reconnecting...");
 syncProvider.IsConnected = true;
 dataService.SyncNow();
 Console.WriteLine($"After sync: {dataService.PendingChanges().Count} pending change(s), {syncProvider.PushedChanges.Count} pushed to the cloud");
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
+var operationsLog = File.ReadAllLines(operationsLogPath);
+Console.WriteLine($"{operationsLog.Length} operation(s) recorded in {operationsLogPath}:");
+foreach (var line in operationsLog)
+{
+    Console.WriteLine("  " + line);
+}
+
+Console.WriteLine();
+Console.WriteLine("Simulating a logging service outage (fails every attempt)...");
+var alwaysFailingLogger = new AuditLogger(new AlwaysFailingSink(), adminAlerts, maxAttempts: 3, retryDelay: TimeSpan.Zero);
+try
+{
+    alwaysFailingLogger.Log("DemoFailingOperation", Environment.UserName);
+}
+catch (AuditLoggingFailedException ex)
+{
+    Console.WriteLine($"Logging failed after retries, as expected: {ex.Message}");
+    Console.WriteLine($"Admin was alerted: \"{adminAlerts.Alerts[^1]}\"");
+}
+
+sealed class AlwaysFailingSink : IAuditLogSink
+{
+    public void Write(OperationLogEntry entry) => throw new AuditSinkUnavailableException("Simulated logging service outage.");
+}

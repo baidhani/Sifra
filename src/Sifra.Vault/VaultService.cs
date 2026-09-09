@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Sifra.Vault.Audit;
 
 namespace Sifra.Vault;
 
@@ -13,10 +14,17 @@ public sealed class VaultService
     private const int Pbkdf2Iterations = 210_000; // OWASP current minimum for PBKDF2-SHA256
 
     private readonly VaultStore _store;
+    private readonly AuditLogger? _auditLogger;
 
-    public VaultService(VaultStore store)
+    /// <param name="auditLogger">
+    /// Optional (STORY-015). When provided, a successful CreateVault call is
+    /// logged to the trust-spine audit trail. Null means no audit logging —
+    /// existing callers and tests are unaffected.
+    /// </param>
+    public VaultService(VaultStore store, AuditLogger? auditLogger = null)
     {
         _store = store;
+        _auditLogger = auditLogger;
     }
 
     /// <summary>
@@ -54,6 +62,8 @@ public sealed class VaultService
             RecoveryKeyHashBase64: Convert.ToBase64String(hash));
 
         _store.Save(record);
+
+        _auditLogger?.Log(nameof(CreateVault), Environment.UserName);
 
         return recoveryKey;
     }
