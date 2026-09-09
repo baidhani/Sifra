@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 4,
+    "stories_verified": 5,
     "stories_submitted": 0,
-    "stories_in_progress": 12,
+    "stories_in_progress": 11,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 14,
-    "points_awarded": 865
+    "criteria_passed": 17,
+    "points_awarded": 915
   },
   "stories": [
     {
@@ -673,19 +673,15 @@
       "notes": "Additive wiring: VaultService, VaultAuthenticator and VaultDataService each take an optional AuditLogger (default null = no-op), so STORY-001/013/014 behavior and their existing tests are unaffected when no logger is passed (confirmed: all prior tests still pass). UserId is Environment.UserName — this app has no account/identity system, so the OS user is the honest identifier available today. Admin alerting uses IAdminAlertSink + LocalFakeAdminAlertSink, a stand-in for a real channel (email/Slack/etc.) since no such integration or credentials exist yet. Credentials/passwords are never included in log details (verified by test).",
       "updated_at": "2026-09-09T17:50:43.084Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given any vault operation occurs, when the operation is completed, then it is logged with a timestamp and user ID.",
-          "Given a logging failure occurs, when an operation is attempted, then the system retries logging and alerts the admin.",
-          "Trust: All operations are logged with a unique operation ID for traceability."
-        ]
+        "verified_at": "2026-09-09T17:51:15.742Z",
+        "commit_sha": "8464508da97240be940011b4a781eef4a7434947",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/8464508da97240be940011b4a781eef4a7434947",
+        "commit_at": "2026-09-09T17:51:08Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     }
   ]
