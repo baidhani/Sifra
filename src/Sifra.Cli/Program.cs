@@ -1,5 +1,6 @@
 using Sifra.Vault;
 using Sifra.Vault.Auth;
+using Sifra.Vault.Sync;
 
 // Optional first argument overrides where vault data lives — useful for
 // demos so they never touch a real user's actual application-data folder.
@@ -45,3 +46,28 @@ cloud.SignOut();
 Console.WriteLine($"Cloud signed out. Vault authenticate is unaffected and still succeeds: {vaultAuth.Authenticate("demo-password")}");
 
 Console.WriteLine($"Wrong vault credential is rejected: {vaultAuth.Authenticate("not-the-password")}");
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-014: local-first operation with offline usability ---");
+
+var syncProvider = new LocalFakeCloudSyncProvider(); // starts disconnected — offline
+var dataService = new VaultDataService(new VaultDataStore(dataDirectory), new OfflineChangeQueueStore(dataDirectory), syncProvider);
+
+Console.WriteLine($"Offline (connected={syncProvider.IsConnected}). Editing a vault data item...");
+dataService.Edit(new VaultDataItem("note-1", "buy milk", DateTimeOffset.UtcNow));
+Console.WriteLine($"View works offline: {dataService.View().Count} item(s) — \"{dataService.View()[0].Content}\"");
+Console.WriteLine($"Queued for sync: {dataService.PendingChanges().Count} pending change(s)");
+
+try
+{
+    dataService.SyncNow();
+}
+catch (SyncUnavailableException ex)
+{
+    Console.WriteLine($"Sync attempt while offline correctly failed: {ex.Message}");
+}
+
+Console.WriteLine("Reconnecting...");
+syncProvider.IsConnected = true;
+dataService.SyncNow();
+Console.WriteLine($"After sync: {dataService.PendingChanges().Count} pending change(s), {syncProvider.PushedChanges.Count} pushed to the cloud");
