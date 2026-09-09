@@ -1,39 +1,628 @@
 {
   "schema_version": 2,
-  "_how_to_use": "Start with every criterion false — that is the correct starting state, not an unfinished one. false means \"not claimed\": either not done, or done but not yet checked. Set one to true only after you have read the code and confirmed it is genuinely true today. Nothing is lost by leaving a line false; a story sitting at 3 of 5 reports honestly and the portal shows you which two are left. Do not retype the criterion text — flip the boolean beside it.",
+  "project": "Sifra",
   "totals": {
-    "stories_total": 15,
-    "stories_verified": 0,
-    "criteria_total": 5,
+    "stories_total": 16,
+    "stories_verified": 1,
+    "stories_submitted": 0,
+    "stories_in_progress": 15,
+    "stories_not_started": 0,
+    "criteria_total": 50,
     "criteria_passed": 5,
-    "points_awarded": 0
+    "points_awarded": 715
   },
   "stories": [
     {
       "id": "STORY-000",
-      "verification": { "state": "submitted", "commit": null, "points": null },
+      "release": null,
+      "acceptance_total": 5,
       "criteria": [
-        { "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.", "passed": true },
-        { "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.", "passed": true },
-        { "text": "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.", "passed": true },
-        { "text": "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.", "passed": true },
-        { "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.", "passed": true }
-      ]
+        {
+          "text": "Given the Command Center, when it is opened, then every tab is reachable and every card drills down one level.",
+          "passed": true
+        },
+        {
+          "text": "Given sample mode, when any tab is shown, then the sample data is visibly labelled as sample.",
+          "passed": true
+        },
+        {
+          "text": "Given the Command Center, when any tab renders, then .colaberry/plan.json and .colaberry/progress.json are both committed in this repo and every tab reads its content from them at runtime rather than from hard-coded values.",
+          "passed": true
+        },
+        {
+          "text": "Given the Command Center, when any tab is shown, then .colaberry/manifest.json is committed in this repo and every tab shows how old that data is and warns when the age exceeds a week.",
+          "passed": true
+        },
+        {
+          "text": "Trust — no tab shows a number, a connection or a result the project has not actually produced.",
+          "passed": true
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "verified",
+        "criteria_passed": 5,
+        "criteria_total": 5,
+        "verified_at": "2026-09-09T16:18:56.498Z",
+        "commit_sha": "5350e75daa9c99c24933634ba6c19fab6dd4f3d4",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/5350e75daa9c99c24933634ba6c19fab6dd4f3d4",
+        "commit_at": "2026-09-09T16:15:45Z",
+        "points_awarded": 145,
+        "outstanding": []
+      }
     },
-    { "id": "STORY-001", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-002", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-003", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-004", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-005", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-006", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-007", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-008", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-009", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-010", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-011", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-012", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-013", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-014", "verification": { "state": "not_started", "commit": null, "points": null } },
-    { "id": "STORY-015", "verification": { "state": "not_started", "commit": null, "points": null } }
+    {
+      "id": "STORY-001",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a new user, when they create a vault, then a recovery key is generated.",
+          "passed": false
+        },
+        {
+          "text": "Given a user with a vault, when they attempt to create another vault, then they are prompted to use the existing vault.",
+          "passed": false
+        },
+        {
+          "text": "Trust: The recovery key is securely generated and stored only on the user's device.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a new user, when they create a vault, then a recovery key is generated.",
+          "Given a user with a vault, when they attempt to create another vault, then they are prompted to use the existing vault.",
+          "Trust: The recovery key is securely generated and stored only on the user's device."
+        ]
+      }
+    },
+    {
+      "id": "STORY-002",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user is logged in, when they add a new credential, then it should appear in the list.",
+          "passed": false
+        },
+        {
+          "text": "Given a user is viewing a credential, when they choose to copy the username or password, then it should be copied to the clipboard.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All actions are logged with a timestamp and user ID.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user is logged in, when they add a new credential, then it should appear in the list.",
+          "Given a user is viewing a credential, when they choose to copy the username or password, then it should be copied to the clipboard.",
+          "Trust: All actions are logged with a timestamp and user ID."
+        ]
+      }
+    },
+    {
+      "id": "STORY-003",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user is logged into the vault, when they request a new password, then a strong password is generated.",
+          "passed": false
+        },
+        {
+          "text": "Given a user requests a password of specific length, when the length is invalid, then an error message is displayed.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Generated passwords are logged with a timestamp for audit purposes.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user is logged into the vault, when they request a new password, then a strong password is generated.",
+          "Given a user requests a password of specific length, when the length is invalid, then an error message is displayed.",
+          "Trust: Generated passwords are logged with a timestamp for audit purposes."
+        ]
+      }
+    },
+    {
+      "id": "STORY-004",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user has locked the vault, when they unlock it, then all credentials should be accessible.",
+          "passed": false
+        },
+        {
+          "text": "Given a user closes the application, when they reopen it, then the vault should be in a locked state.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Vault data is encrypted and persists without loss on close/reopen.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user has locked the vault, when they unlock it, then all credentials should be accessible.",
+          "Given a user closes the application, when they reopen it, then the vault should be in a locked state.",
+          "Trust: Vault data is encrypted and persists without loss on close/reopen."
+        ]
+      }
+    },
+    {
+      "id": "STORY-005",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user is logged in, when they change their master password, then the password is updated successfully.",
+          "passed": false
+        },
+        {
+          "text": "Given a user enters an incorrect current password, when attempting to change it, then an error message is displayed.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Password change events are logged with user ID and timestamp.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user is logged in, when they change their master password, then the password is updated successfully.",
+          "Given a user enters an incorrect current password, when attempting to change it, then an error message is displayed.",
+          "Trust: Password change events are logged with user ID and timestamp."
+        ]
+      }
+    },
+    {
+      "id": "STORY-006",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user has a valid recovery key, when they use it, then access to the vault is restored.",
+          "passed": false
+        },
+        {
+          "text": "Given a user enters an invalid recovery key, when attempting recovery, then an error message is displayed.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Recovery attempts are logged with user ID and timestamp.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user has a valid recovery key, when they use it, then access to the vault is restored.",
+          "Given a user enters an invalid recovery key, when attempting recovery, then an error message is displayed.",
+          "Trust: Recovery attempts are logged with user ID and timestamp."
+        ]
+      }
+    },
+    {
+      "id": "STORY-007",
+      "release": "r1",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a vault, when synchronization is enabled, then data is encrypted and uploaded to Google Drive.",
+          "passed": false
+        },
+        {
+          "text": "Given a vault, when synchronization fails, then local data remains intact.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Synchronization actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a vault, when synchronization is enabled, then data is encrypted and uploaded to Google Drive.",
+          "Given a vault, when synchronization fails, then local data remains intact.",
+          "Trust: Synchronization actions are logged."
+        ]
+      }
+    },
+    {
+      "id": "STORY-008",
+      "release": "r2",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a vault, when synchronized with OneDrive, then data is encrypted and uploaded.",
+          "passed": false
+        },
+        {
+          "text": "Given a vault, when synchronized with Dropbox, then data is encrypted and uploaded.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Synchronization actions are logged for both providers.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a vault, when synchronized with OneDrive, then data is encrypted and uploaded.",
+          "Given a vault, when synchronized with Dropbox, then data is encrypted and uploaded.",
+          "Trust: Synchronization actions are logged for both providers."
+        ]
+      }
+    },
+    {
+      "id": "STORY-009",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a device, when it is revoked, then it cannot access the vault.",
+          "passed": false
+        },
+        {
+          "text": "Given a device, when it is re-enrolled, then it regains access.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Device management actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a device, when it is revoked, then it cannot access the vault.",
+          "Given a device, when it is re-enrolled, then it regains access.",
+          "Trust: Device management actions are logged."
+        ]
+      }
+    },
+    {
+      "id": "STORY-010",
+      "release": "r3",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a browser, when a user visits a login page, then credentials are offered for autofill.",
+          "passed": false
+        },
+        {
+          "text": "Given a browser, when a user denies autofill, then credentials are not filled.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Autofill actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a browser, when a user visits a login page, then credentials are offered for autofill.",
+          "Given a browser, when a user denies autofill, then credentials are not filled.",
+          "Trust: Autofill actions are logged."
+        ]
+      }
+    },
+    {
+      "id": "STORY-011",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a vault, when password health is analyzed, then weak passwords are identified.",
+          "passed": false
+        },
+        {
+          "text": "Given a vault, when breach awareness is enabled, then compromised passwords are flagged.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Analysis results are logged without exposing plaintext passwords.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a vault, when password health is analyzed, then weak passwords are identified.",
+          "Given a vault, when breach awareness is enabled, then compromised passwords are flagged.",
+          "Trust: Analysis results are logged without exposing plaintext passwords."
+        ]
+      }
+    },
+    {
+      "id": "STORY-012",
+      "release": "r4",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a credential, when shared, then the recipient receives an encrypted copy.",
+          "passed": false
+        },
+        {
+          "text": "Given a shared credential, when revoked, then the recipient loses access.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Sharing actions are logged.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a credential, when shared, then the recipient receives an encrypted copy.",
+          "Given a shared credential, when revoked, then the recipient loses access.",
+          "Trust: Sharing actions are logged."
+        ]
+      }
+    },
+    {
+      "id": "STORY-013",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user is logged into cloud storage, when they access the vault, then they must authenticate separately for the vault.",
+          "passed": false
+        },
+        {
+          "text": "Given a user logs out of cloud storage, when they access the vault, then they must authenticate for the vault.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Vault access is logged independently of cloud storage access.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user is logged into cloud storage, when they access the vault, then they must authenticate separately for the vault.",
+          "Given a user logs out of cloud storage, when they access the vault, then they must authenticate for the vault.",
+          "Trust: Vault access is logged independently of cloud storage access."
+        ]
+      }
+    },
+    {
+      "id": "STORY-014",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given a user is offline, when they access the vault, then they should be able to view and edit credentials.",
+          "passed": false
+        },
+        {
+          "text": "Given a user makes changes offline, when they reconnect, then changes should sync with the cloud.",
+          "passed": false
+        },
+        {
+          "text": "Trust: Offline changes are logged and queued for sync.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given a user is offline, when they access the vault, then they should be able to view and edit credentials.",
+          "Given a user makes changes offline, when they reconnect, then changes should sync with the cloud.",
+          "Trust: Offline changes are logged and queued for sync."
+        ]
+      }
+    },
+    {
+      "id": "STORY-015",
+      "release": "r0",
+      "acceptance_total": 3,
+      "criteria": [
+        {
+          "text": "Given any vault operation occurs, when the operation is completed, then it is logged with a timestamp and user ID.",
+          "passed": false
+        },
+        {
+          "text": "Given a logging failure occurs, when an operation is attempted, then the system retries logging and alerts the admin.",
+          "passed": false
+        },
+        {
+          "text": "Trust: All operations are logged with a unique operation ID for traceability.",
+          "passed": false
+        }
+      ],
+      "files_touched": [],
+      "tests_added": [],
+      "notes": null,
+      "updated_at": null,
+      "verification": {
+        "state": "in_progress",
+        "criteria_passed": 0,
+        "criteria_total": 3,
+        "verified_at": null,
+        "commit_sha": null,
+        "commit_url": null,
+        "commit_at": null,
+        "points_awarded": 38,
+        "outstanding": [
+          "Given any vault operation occurs, when the operation is completed, then it is logged with a timestamp and user ID.",
+          "Given a logging failure occurs, when an operation is attempted, then the system retries logging and alerts the admin.",
+          "Trust: All operations are logged with a unique operation ID for traceability."
+        ]
+      }
+    }
   ]
 }
