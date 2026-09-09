@@ -329,21 +329,41 @@
       "criteria": [
         {
           "text": "Given a user has a valid recovery key, when they use it, then access to the vault is restored.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user enters an invalid recovery key, when attempting recovery, then an error message is displayed.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Recovery attempts are logged with user ID and timestamp.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/VaultRecord.cs",
+        "src/Sifra.Vault/VaultService.cs",
+        "src/Sifra.Vault/Crypto/VaultMasterKeySlot.cs",
+        "src/Sifra.Vault/Crypto/VaultMasterKeyStore.cs",
+        "src/Sifra.Vault/Crypto/VaultEncryptionService.cs",
+        "src/Sifra.Vault/Session/InvalidRecoveryKeyException.cs",
+        "src/Sifra.Vault/Session/RecoveryKeyExpiredException.cs",
+        "src/Sifra.Vault/Session/VaultRecoveryService.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/VaultRecoveryServiceTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WithValidRecoveryKey_RestoresAccessToTheVaultIncludingExistingCredentials",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_DoesNotTouchCredentialsJsonAtAll",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WithAnInvalidRecoveryKey_ThrowsAndDisplaysAnError",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WithAnAlreadyUsedRecoveryKey_ThrowsExpired",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WithATooShortNewPassword_ThrowsWithoutConsumingTheRecoveryKey",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WithAuditLoggerProvided_LogsTheAttemptWithoutLoggingTheRecoveryKeyOrPassword",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WhenTheRecoveryKeyIsInvalid_StillLogsTheAttempt",
+        "Sifra.Vault.Tests.VaultRecoveryServiceTests.Recover_WhenLoggingServiceIsUnavailable_PropagatesAClearException"
+      ],
+      "notes": "Deep architectural extension, agreed with user upfront (same class of gap as STORY-005, one layer further): recovery must restore real access to existing credentials, not just reset the login check. VaultMasterKeyStore/VaultEncryptionService extended from a single wrapped key to named multi-slot envelope encryption (master-password and recovery-key slots both wrap the same VMK). Traced to a real STORY-001 gap: CreateVault() never captured an initial master password, so the two slots cannot both be seeded at vault-creation time in one step -- VaultRecoveryService.EstablishRecoverySlot() bridges this by creating the master-password slot (bootstrapping the VMK) and then wrapping the same VMK under the recovery key, called once right after CreateVault() while the recovery key plaintext is available. VaultService gained additive VerifyRecoveryKey/IsRecoveryKeyConsumed/ConsumeRecoveryKey methods (no existing method changed) and VaultRecord gained a backward-compatible nullable RecoveryKeyConsumedAtUtc field. Recovery key is single-use (matches the original STORY-000 data model: consumed on recovery) -- expired is modeled as already used since there is no time-based expiry concept in this vault. Confirmed via test: credentials.json is untouched by recovery, and an existing credential added before recovery is still readable under the new password after recovery, even after an intervening STORY-005 password change (both slots independently wrap the same VMK). Full existing 66-test suite re-verified unaffected by the multi-slot schema change before adding anything new.",
+      "updated_at": "2026-09-09T19:22:58.148Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

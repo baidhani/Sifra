@@ -2,7 +2,11 @@ using System.Text.Json;
 
 namespace Sifra.Vault.Crypto;
 
-/// <summary>Reads and writes the wrapped vault master key file. Same atomic-write pattern as every other store in this codebase.</summary>
+/// <summary>
+/// Persists the named key slots (slot id -> wrapped VMK), keyed by slot
+/// id (e.g. "master-password", "recovery-key"). Same atomic-write pattern
+/// as every other store in this codebase.
+/// </summary>
 public sealed class VaultMasterKeyStore
 {
     private const string FileName = "vault-master-key.json";
@@ -27,17 +31,17 @@ public sealed class VaultMasterKeyStore
         _filePath = Path.Combine(directory, FileName);
     }
 
-    public VaultMasterKeyRecord? Load()
+    public Dictionary<string, VaultMasterKeySlot> LoadAll()
     {
         if (!File.Exists(_filePath))
         {
-            return null;
+            return new Dictionary<string, VaultMasterKeySlot>();
         }
 
         try
         {
             var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<VaultMasterKeyRecord>(json);
+            return JsonSerializer.Deserialize<Dictionary<string, VaultMasterKeySlot>>(json) ?? new Dictionary<string, VaultMasterKeySlot>();
         }
         catch (IOException ex)
         {
@@ -45,9 +49,21 @@ public sealed class VaultMasterKeyStore
         }
     }
 
-    public void Save(VaultMasterKeyRecord record)
+    public bool HasAnySlot() => LoadAll().Count > 0;
+
+    public VaultMasterKeySlot? LoadSlot(string slotId) =>
+        LoadAll().TryGetValue(slotId, out var slot) ? slot : null;
+
+    public void SaveSlot(string slotId, VaultMasterKeySlot slot)
     {
-        var json = JsonSerializer.Serialize(record);
+        var all = LoadAll();
+        all[slotId] = slot;
+        Save(all);
+    }
+
+    private void Save(Dictionary<string, VaultMasterKeySlot> all)
+    {
+        var json = JsonSerializer.Serialize(all);
         var tempFilePath = _filePath + ".tmp";
 
         try

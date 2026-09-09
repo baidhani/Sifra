@@ -49,12 +49,7 @@ public sealed class VaultService
         var recoveryKey = RecoveryKeyGenerator.Generate();
 
         var salt = RandomNumberGenerator.GetBytes(SaltLengthBytes);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(
-            password: recoveryKey,
-            salt: salt,
-            iterations: Pbkdf2Iterations,
-            hashAlgorithm: HashAlgorithmName.SHA256,
-            outputLength: HashLengthBytes);
+        var hash = HashRecoveryKey(recoveryKey, salt);
 
         var record = new VaultRecord(
             CreatedAtUtc: DateTimeOffset.UtcNow,
@@ -67,4 +62,40 @@ public sealed class VaultService
 
         return recoveryKey;
     }
+
+    /// <summary>
+    /// Checks a candidate recovery key against the stored hash. Does not
+    /// check whether the key has already been consumed — see
+    /// <see cref="IsRecoveryKeyConsumed"/> — since "wrong key" and
+    /// "right key but already used" are different, separately reportable
+    /// failure conditions (STORY-006).
+    /// </summary>
+    public bool VerifyRecoveryKey(string candidateRecoveryKey)
+    {
+        var record = _store.Load();
+        if (record is null)
+        {
+            return false;
+        }
+
+        var salt = Convert.FromBase64String(record.RecoveryKeySaltBase64);
+        var expectedHash = Convert.FromBase64String(record.RecoveryKeyHashBase64);
+        var actualHash = HashRecoveryKey(candidateRecoveryKey, salt);
+        return CryptographicOperations.FixedTimeEquals(expectedHash, actualHash);
+    }
+
+    public bool IsRecoveryKeyConsumed() => _store.Load()?.RecoveryKeyConsumedAtUtc is not null;
+
+    /// <summary>
+    /// Marks the recovery key as used — it is single-use by design (see
+    /// the original data model: "consumed on recovery").
+    /// </summary>
+    public void ConsumeRecoveryKey()
+    {
+        var record = _store.Load() ?? throw new InvalidOperationException("No vault exists to consume a recovery key for.");
+        _store.Save(record with { RecoveryKeyConsumedAtUtc = DateTimeOffset.UtcNow });
+    }
+
+    private static byte[] HashRecoveryKey(string recoveryKey, byte[] salt) =>
+        Rfc2898DeriveBytes.Pbkdf2(recoveryKey, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, HashLengthBytes);
 }

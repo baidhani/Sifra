@@ -19,13 +19,22 @@ var auditLogger = new AuditLogger(new FileAuditLogSink(operationsLogPath), admin
 var store = new VaultStore(dataDirectory);
 var service = new VaultService(store, auditLogger);
 
+var vaultLogPath = Path.Combine(resolvedDataDirectory, "vault-access.log");
+var vaultAuth = new VaultAuthenticator(new VaultAccessCredentialStore(dataDirectory), new FileAccessAuditLog(vaultLogPath), auditLogger);
+var vaultRecovery = new VaultRecoveryService(service, vaultAuth, new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)), auditLogger);
+
+string? demoRecoveryKey = null;
 try
 {
-    var recoveryKey = service.CreateVault();
+    demoRecoveryKey = service.CreateVault();
     Console.WriteLine("Vault created.");
     Console.WriteLine();
     Console.WriteLine("Your recovery key (shown once — save it somewhere safe now):");
-    Console.WriteLine(recoveryKey);
+    Console.WriteLine(demoRecoveryKey);
+
+    // Links the recovery key to the vault master key while it's still in
+    // plaintext (STORY-006) and sets the initial master password.
+    vaultRecovery.EstablishRecoverySlot(demoRecoveryKey, "demo-password");
 }
 catch (VaultAlreadyExistsException)
 {
@@ -40,10 +49,7 @@ catch (VaultStorageException ex)
 Console.WriteLine();
 Console.WriteLine("--- STORY-013: cloud auth and vault auth are separate ---");
 
-var vaultLogPath = Path.Combine(resolvedDataDirectory, "vault-access.log");
-
-var vaultAuth = new VaultAuthenticator(new VaultAccessCredentialStore(dataDirectory), new FileAccessAuditLog(vaultLogPath), auditLogger);
-vaultAuth.SetCredential("demo-password");
+vaultAuth.SetCredential("demo-password"); // idempotent — already set by EstablishRecoverySlot above
 
 var cloud = new LocalFakeCloudAuthProvider();
 
@@ -196,6 +202,42 @@ var viewWithNewPassword = credentials.GetById("new-demo-password-123", thirdCred
 Console.WriteLine($"Existing credential still decrypts correctly under the new password: username=\"{viewWithNewPassword.Username}\"");
 
 credentials.Delete(thirdCredentialId); // tidy up
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-006: recover vault with recovery key ---");
+
+var recoveryDemoCredentialId = credentials.Add("new-demo-password-123", "GitHub", "firas", "hunter2", "https://github.com");
+
+if (demoRecoveryKey is not null)
+{
+    try
+    {
+        vaultRecovery.Recover("WRONG-RECOVERY-KEY-VALUE", "recovered-password-456");
+    }
+    catch (InvalidRecoveryKeyException ex)
+    {
+        Console.WriteLine($"Recovery with an invalid key correctly refused: {ex.Message}");
+    }
+
+    vaultRecovery.Recover(demoRecoveryKey, "recovered-password-456");
+    Console.WriteLine("Vault recovered with a new master password.");
+    Console.WriteLine($"Pre-recovery password now rejected: {vaultAuth.Authenticate("new-demo-password-123")}");
+    Console.WriteLine($"New recovered password accepted: {vaultAuth.Authenticate("recovered-password-456")}");
+
+    var recoveredView = credentials.GetById("recovered-password-456", recoveryDemoCredentialId);
+    Console.WriteLine($"Existing credential still accessible after recovery: username=\"{recoveredView.Username}\"");
+
+    try
+    {
+        vaultRecovery.Recover(demoRecoveryKey, "yet-another-password-789");
+    }
+    catch (RecoveryKeyExpiredException ex)
+    {
+        Console.WriteLine($"Reusing the same recovery key correctly refused: {ex.Message}");
+    }
+}
+
+credentials.Delete(recoveryDemoCredentialId); // tidy up
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
