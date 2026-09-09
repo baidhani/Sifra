@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 5,
+    "stories_verified": 6,
     "stories_submitted": 0,
-    "stories_in_progress": 11,
+    "stories_in_progress": 10,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 17,
-    "points_awarded": 915
+    "criteria_passed": 20,
+    "points_awarded": 965
   },
   "stories": [
     {
@@ -156,19 +156,15 @@
       "notes": "Username and password are encrypted at rest (AES-GCM, key derived via PBKDF2 from the same vault credential STORY-013 uses, but a separate persisted salt so the two derived outputs are cryptographically independent) — a deliberate, user-approved decision to go beyond this story's literal brief rather than ship plaintext secrets. Label and Url are kept as plaintext metadata (documented scoping choice, not yet confirmed with user). Added first external dependency: TextCopy (cross-platform clipboard) — flagged to user, encryption choice explicitly confirmed, clipboard package usage implicitly accepted pending final confirmation. CredentialService does not itself enforce authentication — callers (CLI demo, tests) pass the same vault credential already proven via VaultAuthenticator; a real session/lock gate is STORY-004/005's job. Reuses the existing AuditLogger (STORY-015) without modification; verified no plaintext secret ever appears in log lines.",
       "updated_at": "2026-09-09T18:11:59.780Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a user is logged in, when they add a new credential, then it should appear in the list.",
-          "Given a user is viewing a credential, when they choose to copy the username or password, then it should be copied to the clipboard.",
-          "Trust: All actions are logged with a timestamp and user ID."
-        ]
+        "verified_at": "2026-09-09T18:12:34.952Z",
+        "commit_sha": "d873175f3a4450a87466dcf31a442b2fdd86bb7a",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/d873175f3a4450a87466dcf31a442b2fdd86bb7a",
+        "commit_at": "2026-09-09T18:12:26Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
