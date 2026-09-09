@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 1,
+    "stories_verified": 2,
     "stories_submitted": 0,
-    "stories_in_progress": 15,
+    "stories_in_progress": 14,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 5,
-    "points_awarded": 715
+    "criteria_passed": 8,
+    "points_awarded": 765
   },
   "stories": [
     {
@@ -89,19 +89,15 @@
       "notes": "CLI demo (Sifra.Cli) prints the recovery key once on first run and the existing-vault message on second run; verified manually against an isolated temp APPDATA. Recovery key: 160-bit RandomNumberGenerator output, Base32-encoded; only a PBKDF2-SHA256 (210k iterations) hash of it is persisted, never the plaintext.",
       "updated_at": "2026-09-09T17:03:06.093Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a new user, when they create a vault, then a recovery key is generated.",
-          "Given a user with a vault, when they attempt to create another vault, then they are prompted to use the existing vault.",
-          "Trust: The recovery key is securely generated and stored only on the user's device."
-        ]
+        "verified_at": "2026-09-09T17:03:38.318Z",
+        "commit_sha": "a4c881a329f84dc9a9cfb21fdde7d088d9d7ff94",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/a4c881a329f84dc9a9cfb21fdde7d088d9d7ff94",
+        "commit_at": "2026-09-09T17:03:26Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
