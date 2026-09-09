@@ -61,21 +61,33 @@
       "criteria": [
         {
           "text": "Given a new user, when they create a vault, then a recovery key is generated.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a user with a vault, when they attempt to create another vault, then they are prompted to use the existing vault.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: The recovery key is securely generated and stored only on the user's device.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/VaultRecord.cs",
+        "src/Sifra.Vault/VaultExceptions.cs",
+        "src/Sifra.Vault/VaultStore.cs",
+        "src/Sifra.Vault/RecoveryKeyGenerator.cs",
+        "src/Sifra.Vault/VaultService.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/VaultServiceTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.VaultServiceTests.CreateVault_WhenNoVaultExists_ReturnsRecoveryKeyAndPersistsOnlyItsHash",
+        "Sifra.Vault.Tests.VaultServiceTests.CreateVault_WhenVaultAlreadyExists_ThrowsSoCallerCanPromptToUseExistingVault",
+        "Sifra.Vault.Tests.VaultServiceTests.CreateVault_WhenStorageDirectoryCannotBeCreated_ThrowsVaultStorageException"
+      ],
+      "notes": "CLI demo (Sifra.Cli) prints the recovery key once on first run and the existing-vault message on second run; verified manually against an isolated temp APPDATA. Recovery key: 160-bit RandomNumberGenerator output, Base32-encoded; only a PBKDF2-SHA256 (210k iterations) hash of it is persisted, never the plaintext.",
+      "updated_at": "2026-09-09T17:03:06.093Z",
       "verification": {
         "state": "in_progress",
         "criteria_passed": 0,

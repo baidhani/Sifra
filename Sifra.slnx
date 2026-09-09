@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Sifra.Cli/Sifra.Cli.csproj" />
+    <Project Path="src/Sifra.Vault/Sifra.Vault.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Sifra.Vault.Tests/Sifra.Vault.Tests.csproj" />
+  </Folder>
+</Solution>
