@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 6,
+    "stories_verified": 7,
     "stories_submitted": 0,
-    "stories_in_progress": 10,
+    "stories_in_progress": 9,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 20,
-    "points_awarded": 965
+    "criteria_passed": 23,
+    "points_awarded": 1015
   },
   "stories": [
     {
@@ -206,19 +206,15 @@
       "notes": "Deliberate deviation from the literal acceptance text: the audit log records that a password was generated (timestamp, user, requested length) but never the password value itself — logging real secrets would violate the no-secrets-in-logs rule that governs this whole project. Reused AuditLogger (STORY-015) unmodified. PasswordGenerator does not itself enforce authentication (same convention as STORY-002 — a real session/lock gate is STORY-004/005's job). Length bounds are [8, 128]; strength is guaranteed inclusion of lowercase/uppercase/digit/symbol via a crypto-random Fisher-Yates shuffle, using RandomNumberGenerator.GetInt32 (BCL, already unbiased).",
       "updated_at": "2026-09-09T18:21:20.222Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a user is logged into the vault, when they request a new password, then a strong password is generated.",
-          "Given a user requests a password of specific length, when the length is invalid, then an error message is displayed.",
-          "Trust: Generated passwords are logged with a timestamp for audit purposes."
-        ]
+        "verified_at": "2026-09-09T18:21:52.455Z",
+        "commit_sha": "a9f4552ac743719c8c77d5aad8aa82939b2940fb",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/a9f4552ac743719c8c77d5aad8aa82939b2940fb",
+        "commit_at": "2026-09-09T18:21:43Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
