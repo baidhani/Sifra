@@ -3,6 +3,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.GoogleDrive;
 using Sifra.Vault.Passwords;
 using Sifra.Vault.Session;
 using Sifra.Vault.Sync;
@@ -240,6 +241,55 @@ if (demoRecoveryKey is not null)
 credentials.Delete(recoveryDemoCredentialId); // tidy up
 
 Console.WriteLine();
+Console.WriteLine("--- STORY-007: synchronize vault with Google Drive ---");
+
+var secretsFile = FindGoogleOAuthSecretsFile();
+if (secretsFile is null)
+{
+    Console.WriteLine("No .secrets/google-oauth.json found — skipping the live Google Drive demo.");
+}
+else
+{
+    using var secretsDoc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(secretsFile));
+    var clientId = secretsDoc.RootElement.GetProperty("clientId").GetString()!;
+    var clientSecret = secretsDoc.RootElement.GetProperty("clientSecret").GetString()!;
+
+    var tokenStoreDir = Path.Combine(resolvedDataDirectory, "google-token-cache");
+    var googleAuth = new GoogleDriveAuthProvider(clientId, clientSecret, tokenStoreDir);
+
+    Console.WriteLine("Opening your browser to sign in to Google...");
+    try
+    {
+        googleAuth.SignIn("firas.sql@gmail.com");
+        Console.WriteLine($"Google sign-in succeeded. Connected: {googleAuth.IsAuthenticated}");
+
+        using var driveApiClient = new RealGoogleDriveApiClient(googleAuth.Credential!);
+        var googleSyncProvider = new GoogleDriveSyncProvider(
+            driveApiClient,
+            new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)),
+            googleAuth,
+            "recovered-password-456");
+
+        var googleDataService = new VaultDataService(
+            new VaultDataStore(dataDirectory),
+            new OfflineChangeQueueStore(dataDirectory),
+            googleSyncProvider,
+            auditLogger);
+
+        googleDataService.Edit(new VaultDataItem("google-sync-demo", "real Google Drive sync test", DateTimeOffset.UtcNow));
+        Console.WriteLine($"Queued for sync: {googleDataService.PendingChanges().Count} pending change(s)");
+
+        googleDataService.SyncNow();
+        Console.WriteLine("Synced to REAL Google Drive successfully.");
+        Console.WriteLine($"Pending changes remaining: {googleDataService.PendingChanges().Count}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Live Google Drive demo did not complete: {ex.GetType().Name}: {ex.Message}");
+    }
+}
+
+Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
 var operationsLog = File.ReadAllLines(operationsLogPath);
 Console.WriteLine($"{operationsLog.Length} operation(s) recorded in {operationsLogPath}:");
@@ -259,6 +309,21 @@ catch (AuditLoggingFailedException ex)
 {
     Console.WriteLine($"Logging failed after retries, as expected: {ex.Message}");
     Console.WriteLine($"Admin was alerted: \"{adminAlerts.Alerts[^1]}\"");
+}
+
+static string? FindGoogleOAuthSecretsFile()
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    for (int i = 0; i < 8 && dir is not null; i++)
+    {
+        var candidate = Path.Combine(dir.FullName, ".secrets", "google-oauth.json");
+        if (File.Exists(candidate))
+        {
+            return candidate;
+        }
+        dir = dir.Parent;
+    }
+    return null;
 }
 
 sealed class AlwaysFailingSink : IAuditLogSink

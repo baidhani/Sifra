@@ -146,18 +146,18 @@ public sealed class VaultSessionTests : IDisposable
         var credentialService = CreateCredentialService();
         var id = credentialService.Add(MasterPassword, "GitHub", "firas", "hunter2", "https://github.com");
 
-        // Flip one character inside the encrypted password value
-        // deterministically — a blind global string replace is flaky
-        // (the random ciphertext may not happen to contain that
-        // character on a given run) and could corrupt JSON structure
-        // instead of the ciphertext.
+        // Flip one character of the encrypted password value on the
+        // deserialized object, not the raw JSON text — System.Text.Json
+        // escapes some base64 characters (e.g. '+' as "+"), so
+        // editing raw text could corrupt the JSON escape sequence itself
+        // instead of the ciphertext, producing an inconsistent failure.
         var filePath = Path.Combine(_dataDirectory, "credentials.json");
-        var original = File.ReadAllText(filePath);
-        const string marker = "\"EncryptedPasswordBase64\":\"";
-        var valueStart = original.IndexOf(marker, StringComparison.Ordinal) + marker.Length;
-        var flipChar = original[valueStart] == 'A' ? 'B' : 'A';
-        var corrupted = original[..valueStart] + flipChar + original[(valueStart + 1)..];
-        File.WriteAllText(filePath, corrupted);
+        var records = System.Text.Json.JsonSerializer.Deserialize<List<Sifra.Vault.Credentials.Credential>>(File.ReadAllText(filePath))!;
+        var record = records[0];
+        var chars = record.EncryptedPasswordBase64.ToCharArray();
+        chars[0] = chars[0] == 'A' ? 'B' : 'A';
+        records[0] = record with { EncryptedPasswordBase64 = new string(chars) };
+        File.WriteAllText(filePath, System.Text.Json.JsonSerializer.Serialize(records));
 
         var session = new VaultSession(authenticator);
         session.Unlock(MasterPassword);
