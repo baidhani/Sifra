@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 10,
+    "stories_verified": 11,
     "stories_submitted": 0,
-    "stories_in_progress": 6,
+    "stories_in_progress": 5,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 32,
-    "points_awarded": 1165
+    "criteria_passed": 35,
+    "points_awarded": 1215
   },
   "stories": [
     {
@@ -421,19 +421,15 @@
       "notes": "REAL, LIVE-VERIFIED integration, not just unit-tested — this is the swap-in moment STORY-013/014 built their ICloudAuthProvider/ICloudSyncProvider seams for. GoogleDriveAuthProvider (real OAuth 2.0 installed-app flow via Google.Apis.Auth) and GoogleDriveSyncProvider (real Drive API calls via Google.Apis.Drive.v3) implement those existing interfaces with zero changes to VaultAuthenticator or VaultDataService. Data is encrypted with the existing VaultEncryptionService before it ever leaves the device (REQ-010's 'encrypted' requirement). Idempotent: syncing twice updates the same named Drive file rather than creating a second one (verified by test). Capped retries (3 attempts) on network failures; unauthorized responses are never retried since the credential itself is the problem, not a transient blip. Criterion 2 (local data intact on sync failure) falls out of STORY-014's existing VaultDataService design (it only removes/marks queue entries based on returned outcomes, never before a successful Push) and is proven end-to-end by a new integration test, not just asserted. Criterion 3 (logging) is already covered by VaultDataService.SyncNow()'s existing AuditLogger call from STORY-015 -- no new logging code needed. Client ID/Secret (obtained by the user by following my step-by-step Google Cloud Console instructions) are stored in a local .secrets/google-oauth.json file, confirmed never tracked by git. LIVE VERIFICATION: the user completed a real OAuth consent flow in their browser against their real Google account (test user firas.sql@gmail.com); the CLI genuinely uploaded an encrypted payload to their real Google Drive; a separate follow-up script independently re-used the cached OAuth token (no browser needed) and confirmed the file exists in Drive by its file id. This is the first story in this project verified against a real external system, not a local fake. 8 new unit tests cover the orchestration logic (encryption, idempotent upsert, retry, failure classification) against an in-memory fake IGoogleDriveApiClient -- the real Google SDK wiring itself is inherently only verifiable via the live run just performed, not repeatable in an automated test without live credentials. Also fixed a rare, previously-undiagnosed intermittent failure in a STORY-005 test (VaultSessionTests' ciphertext-corruption test occasionally mutated a JSON escape sequence instead of the ciphertext itself, since System.Text.Json escapes '+' as a unicode escape -- fixed by corrupting the deserialized value instead of raw JSON text).",
       "updated_at": "2026-09-09T22:22:27.204Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a vault, when synchronization is enabled, then data is encrypted and uploaded to Google Drive.",
-          "Given a vault, when synchronization fails, then local data remains intact.",
-          "Trust: Synchronization actions are logged."
-        ]
+        "verified_at": "2026-09-09T22:23:10.605Z",
+        "commit_sha": "50a5693800cb726f0a6f4fed9bbe79c86235c64b",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/50a5693800cb726f0a6f4fed9bbe79c86235c64b",
+        "commit_at": "2026-09-09T22:22:58Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
