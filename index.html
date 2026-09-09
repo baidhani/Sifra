@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sifra Command Center</title>
+<style>
+  /* ---- Palette: no brand colours chosen yet. Neutral placeholder, one place to change. ---- */
+  :root {
+    --cc-bg: #f3f4f7;
+    --cc-surface: #ffffff;
+    --cc-surface-alt: #f7f8fa;
+    --cc-border: #e3e6ec;
+    --cc-border-soft: #edeff3;
+    --cc-text: #17202e;
+    --cc-text-muted: #5c6574;
+    --cc-text-faint: #949dab;
+    --cc-accent: #22314f;
+    --cc-accent-2: #3a5279;
+    --cc-accent-soft: #eaeef5;
+    --cc-warn-bg: #fdf3e0;
+    --cc-warn-border: #ecb84a;
+    --cc-warn-text: #7a4c00;
+    --cc-ok: #2f7d4f;
+    --cc-grey-dot: #a4abb7;
+    --cc-sample-bg: #fdedb8;
+    --cc-sample-text: #6b4e00;
+    --cc-shadow-sm: 0 1px 2px rgba(23,32,46,0.05);
+    --cc-shadow-md: 0 4px 14px rgba(23,32,46,0.07), 0 1px 3px rgba(23,32,46,0.05);
+    --cc-shadow-lg: 0 12px 32px rgba(23,32,46,0.10), 0 2px 6px rgba(23,32,46,0.06);
+    --cc-radius: 12px;
+    --cc-radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(1200px 480px at 100% -10%, rgba(58,82,121,0.06), transparent 60%),
+      var(--cc-bg);
+    color: var(--cc-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+  ::selection { background: var(--cc-accent-2); color: #fff; }
+
+  .cc-app { display: flex; min-height: 100vh; }
+
+  .cc-sidebar {
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--cc-surface);
+    border-right: 1px solid var(--cc-border);
+    padding: 22px 0 20px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .cc-brand {
+    padding: 0 22px 18px 22px;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cc-brand-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: linear-gradient(155deg, var(--cc-accent-2), var(--cc-accent));
+    box-shadow: var(--cc-shadow-sm);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .cc-brand-text small {
+    display: block;
+    font-weight: 500;
+    color: var(--cc-text-faint);
+    font-size: 10.5px;
+    margin-top: 1px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .cc-nav-section {
+    padding: 0 22px;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--cc-text-faint);
+    margin: 16px 0 6px;
+  }
+  .cc-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 2px 10px;
+    padding: 9px 12px;
+    color: var(--cc-text-muted);
+    text-decoration: none;
+    font-size: 13.2px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--cc-radius-sm);
+    transition: background .12s ease, color .12s ease;
+  }
+  .cc-nav-item .cc-nav-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cc-border);
+    flex-shrink: 0;
+    transition: background .12s ease;
+  }
+  .cc-nav-item:hover { background: var(--cc-surface-alt); color: var(--cc-text); }
+  .cc-nav-item.active {
+    background: var(--cc-accent-soft);
+    color: var(--cc-accent);
+    font-weight: 700;
+  }
+  .cc-nav-item.active .cc-nav-dot { background: var(--cc-accent-2); }
+
+  .cc-main { flex: 1; min-width: 0; }
+
+  .cc-topbar {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: saturate(180%) blur(8px);
+    border-bottom: 1px solid var(--cc-border);
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .cc-data-stamp {
+    font-size: 12.5px;
+    color: var(--cc-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cc-data-stamp::before {
+    content: "";
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--cc-ok);
+    flex-shrink: 0;
+  }
+  .cc-data-stamp.warn { color: var(--cc-warn-text); font-weight: 600; }
+  .cc-data-stamp.warn::before { background: var(--cc-warn-border); }
+
+  .cc-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cc-text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .cc-toggle {
+    position: relative;
+    display: inline-flex;
+    background: var(--cc-surface-alt);
+    border: 1px solid var(--cc-border);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .cc-toggle button {
+    position: relative;
+    z-index: 1;
+    border: none;
+    background: transparent;
+    color: var(--cc-text-muted);
+    padding: 6px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 700;
+    border-radius: 999px;
+    transition: color .15s ease;
+  }
+  .cc-toggle button.active { color: #fff; }
+  .cc-toggle-thumb {
+    position: absolute;
+    top: 3px; bottom: 3px; left: 3px;
+    width: calc(50% - 3px);
+    background: linear-gradient(155deg, var(--cc-accent-2), var(--cc-accent));
+    border-radius: 999px;
+    box-shadow: var(--cc-shadow-sm);
+    transition: transform .2s cubic-bezier(.4,0,.2,1);
+  }
+  .cc-toggle-thumb.real { transform: translateX(100%); }
+
+  .cc-content { padding: 32px; max-width: 1200px; }
+
+  .cc-banner {
+    background: linear-gradient(180deg, var(--cc-warn-bg), #fffaf0);
+    border: 1px solid var(--cc-warn-border);
+    color: var(--cc-warn-text);
+    border-radius: var(--cc-radius);
+    padding: 16px 20px;
+    margin-bottom: 26px;
+    font-size: 13px;
+    box-shadow: var(--cc-shadow-sm);
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .cc-banner-icon { font-size: 18px; line-height: 1; margin-top: 1px; }
+  .cc-banner strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+  .cc-sample-flag {
+    display: inline-block;
+    background: var(--cc-sample-bg);
+    color: var(--cc-sample-text);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    margin-left: 10px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    box-shadow: var(--cc-shadow-sm);
+  }
+
+  h1.cc-page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 5px 0; }
+  .cc-page-sub { color: var(--cc-text-muted); font-size: 13.5px; margin-bottom: 26px; max-width: 640px; }
+
+  .cc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+    margin-bottom: 30px;
+  }
+  .cc-card {
+    background: var(--cc-surface);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius);
+    padding: 20px;
+    box-shadow: var(--cc-shadow-sm);
+    cursor: pointer;
+    transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+  }
+  .cc-card:hover {
+    border-color: var(--cc-accent-2);
+    box-shadow: var(--cc-shadow-lg);
+    transform: translateY(-2px);
+  }
+  .cc-card-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--cc-text-faint);
+    margin-bottom: 10px;
+  }
+  .cc-card-value {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--cc-accent);
+  }
+  .cc-card-detail { font-size: 12px; color: var(--cc-text-muted); margin-top: 8px; }
+
+  .cc-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cc-text-muted);
+    margin: 36px 0 14px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--cc-border);
+  }
+
+  .cc-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cc-grey-dot);
+    margin-right: 6px;
+  }
+
+  .cc-empty {
+    background: var(--cc-surface);
+    border: 1px dashed var(--cc-border);
+    border-radius: var(--cc-radius);
+    padding: 44px 24px;
+    text-align: center;
+    color: var(--cc-text-muted);
+  }
+  .cc-empty strong { display: block; color: var(--cc-text); margin-bottom: 6px; font-size: 15px; }
+
+  .cc-detail-back {
+    display: inline-block;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--cc-accent);
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  table.cc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--cc-surface);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius);
+    overflow: hidden;
+    box-shadow: var(--cc-shadow-sm);
+  }
+  table.cc-table th, table.cc-table td {
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--cc-border-soft);
+  }
+  table.cc-table tr:last-child td { border-bottom: none; }
+  table.cc-table tbody tr:hover td { background: var(--cc-surface-alt); }
+  table.cc-table th { color: var(--cc-text-faint); font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em; background: var(--cc-surface-alt); }
+
+  .cc-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+  .cc-badge.must { background: #fbe2e1; color: #9c2a26; }
+  .cc-badge.should { background: #dfe9fd; color: #234b8f; }
+
+  .cc-footer-note { margin-top: 44px; font-size: 11px; color: var(--cc-text-faint); }
+
+  @media (max-width: 720px) {
+    .cc-app { flex-direction: column; }
+    .cc-sidebar { width: 100%; height: auto; position: static; }
+    .cc-content { padding: 18px; }
+    .cc-topbar { padding: 12px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cc-app">
+  <nav class="cc-sidebar">
+    <div class="cc-brand">
+      <div class="cc-brand-mark">S</div>
+      <div class="cc-brand-text">Sifra<small>Command Center</small></div>
+    </div>
+    <div class="cc-nav-section">Navigate</div>
+    <div id="cc-nav"></div>
+  </nav>
+
+  <div class="cc-main">
+    <div class="cc-topbar">
+      <div id="cc-data-stamp" class="cc-data-stamp">Loading data…</div>
+      <div class="cc-toggle-group">
+        Data mode
+        <div class="cc-toggle" id="cc-mode-toggle">
+          <div class="cc-toggle-thumb" id="cc-toggle-thumb"></div>
+          <button data-mode="sample" id="cc-btn-sample">Sample</button>
+          <button data-mode="real" id="cc-btn-real">Real</button>
+        </div>
+      </div>
+    </div>
+    <div class="cc-content" id="cc-content">Loading…</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TABS = [
+    { id: "overview", label: "Overview", built: true },
+    { id: "outcomes", label: "Outcomes", built: true },
+    { id: "users", label: "Users & Use Case", built: true },
+    { id: "guardrails", label: "Guardrails", built: true },
+    { id: "systems", label: "Systems", built: true },
+    { id: "pm", label: "Project Management", built: true },
+    { id: "agents", label: "AI Agents", built: true },
+    { id: "kb", label: "Knowledge Base", built: true },
+    { id: "datamodel", label: "Data Model", built: true }
+  ];
+
+  var state = {
+    mode: (localStorage.getItem("cc-mode") || "real"),
+    route: parseRoute(),
+    plan: null,
+    progress: null,
+    manifest: null,
+    loadError: null
+  };
+
+  function parseRoute() {
+    var hash = window.location.hash.replace(/^#\/?/, "");
+    if (!hash) return { tab: "overview", detail: null };
+    var parts = hash.split("/");
+    return { tab: parts[0] || "overview", detail: parts[1] || null };
+  }
+
+  window.addEventListener("hashchange", function () {
+    state.route = parseRoute();
+    render();
+  });
+
+  function setMode(mode) {
+    state.mode = mode;
+    localStorage.setItem("cc-mode", mode);
+    render();
+  }
+
+  function fetchJson(path) {
+    return fetch(path, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error(path + " -> " + r.status);
+      return r.json();
+    });
+  }
+
+  Promise.all([
+    fetchJson(".colaberry/plan.json"),
+    fetchJson(".colaberry/progress.json"),
+    fetchJson(".colaberry/manifest.json")
+  ]).then(function (results) {
+    state.plan = results[0];
+    state.progress = results[1];
+    state.manifest = results[2];
+    render();
+  }).catch(function (err) {
+    state.loadError = err.message;
+    render();
+  });
+
+  // ---- Sample data: believable, clearly synthetic, never mixed with real ----
+  function sampleOverlay(real) {
+    return {
+      totals: { stories_total: 15, stories_verified: 6, criteria_total: 62, criteria_passed: 41, points_awarded: 34 },
+      schedule: real && real.schedule ? real.schedule : {},
+      project: real && real.project ? real.project : {}
+    };
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "unknown";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+  }
+
+  function relativeAge(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return { days: null, label: "unknown" };
+    var diffMs = Date.now() - d.getTime();
+    var days = Math.floor(diffMs / 86400000);
+    if (days <= 0) return { days: days, label: "today" };
+    if (days === 1) return { days: days, label: "1 day ago" };
+    return { days: days, label: days + " days ago" };
+  }
+
+  function renderDataStamp() {
+    var el = document.getElementById("cc-data-stamp");
+    if (state.loadError) {
+      el.className = "cc-data-stamp warn";
+      el.textContent = "Data files not found (" + state.loadError + "). Sync from the portal to generate them.";
+      return;
+    }
+    if (!state.manifest) { el.textContent = "Loading…"; return; }
+    var age = relativeAge(state.manifest.generated_at);
+    var text = "Data as of " + fmtDate(state.manifest.generated_at) + " (" + age.label + ")";
+    if (age.days !== null && age.days > 7) {
+      el.className = "cc-data-stamp warn";
+      el.textContent = text + " — sync from the portal to refresh.";
+    } else {
+      el.className = "cc-data-stamp";
+      el.textContent = text;
+    }
+  }
+
+  function renderNav() {
+    var nav = document.getElementById("cc-nav");
+    nav.innerHTML = "";
+    TABS.forEach(function (t) {
+      var a = document.createElement("a");
+      a.className = "cc-nav-item" + (state.route.tab === t.id ? " active" : "");
+      a.href = "#/" + t.id;
+      var dot = document.createElement("span");
+      dot.className = "cc-nav-dot";
+      a.appendChild(dot);
+      a.appendChild(document.createTextNode(t.label));
+      nav.appendChild(a);
+    });
+  }
+
+  function sampleFlag() {
+    return state.mode === "sample" ? '<span class="cc-sample-flag">Sample data</span>' : "";
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ---------------- OVERVIEW ----------------
+  function renderOverview(container) {
+    if (state.loadError) {
+      container.innerHTML = '<div class="cc-empty"><strong>No data yet</strong>' +
+        'The Command Center could not load .colaberry/plan.json, progress.json or manifest.json. Sync from the portal to generate them.</div>';
+      return;
+    }
+
+    var plan = state.plan;
+    var progress = state.progress;
+    var totals = (state.mode === "sample") ? sampleOverlay(plan).totals : progress.totals;
+
+    var release0 = (plan.releases || []).find(function (r) { return r.is_demo_target; });
+
+    var html = "";
+
+    html += '<h1 class="cc-page-title">' + esc(plan.project.name) + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">' + esc(plan.project.descriptor) + '</div>';
+
+    html += '<div class="cc-grid">';
+    html += cardHtml("overview", "release", "Current release", release0 ? esc(release0.key) + " — " + esc(release0.name) : "not set",
+      release0 ? (esc(release0.starts_on) + " → " + esc(release0.ends_on)) : "");
+    html += cardHtml("pm", "stories", "Stories verified", totals.stories_verified + " of " + totals.stories_total, "click to see the schedule");
+    html += cardHtml("kb", "criteria", "Criteria passed", totals.criteria_passed + " of " + totals.criteria_total, "click for the traceability table");
+    html += cardHtml("pm", "points", "Points awarded", String(totals.points_awarded), "click for release detail");
+    html += "</div>";
+
+    html += '<div class="cc-section-title">Where you are in the term</div>';
+    html += '<table class="cc-table"><tbody>';
+    html += '<tr><th>Build starts</th><td>' + esc(plan.schedule.build_start) + '</td></tr>';
+    html += '<tr><th>Build ends</th><td>' + esc(plan.schedule.build_end) + '</td></tr>';
+    html += '<tr><th>Demo day</th><td>' + esc(plan.schedule.demo_day) + '</td></tr>';
+    html += '<tr><th>Demo target release</th><td>' + esc(plan.schedule.demo_release_key) + '</td></tr>';
+    html += '</tbody></table>';
+
+    html += '<div class="cc-footer-note">Sifra Command Center — data read at runtime from .colaberry/plan.json, progress.json and manifest.json. Nothing on this screen is hard-coded.</div>';
+
+    container.innerHTML = html;
+
+    container.querySelectorAll("[data-nav]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        window.location.hash = "#/" + el.getAttribute("data-nav");
+      });
+    });
+  }
+
+  function cardHtml(navTarget, key, label, value, detail) {
+    return '<div class="cc-card" data-nav="' + navTarget + '">' +
+      '<div class="cc-card-label">' + esc(label) + '</div>' +
+      '<div class="cc-card-value">' + esc(value) + '</div>' +
+      '<div class="cc-card-detail">' + esc(detail || "") + '</div>' +
+      '</div>';
+  }
+
+  // ---------------- shared helpers ----------------
+  function backLink(tabId) {
+    return '<a class="cc-detail-back" data-nav="' + tabId + '">&larr; Back</a>';
+  }
+
+  function wireNav(container) {
+    container.querySelectorAll("[data-nav]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var target = el.getAttribute("data-nav");
+        var detail = el.getAttribute("data-detail");
+        window.location.hash = "#/" + target + (detail ? "/" + detail : "");
+      });
+    });
+  }
+
+  function findStory(id) {
+    return (state.plan.stories || []).find(function (s) { return s.id === id; });
+  }
+
+  function findProgressStory(id) {
+    return (state.progress.stories || []).find(function (s) { return s.id === id; });
+  }
+
+  function storyState(id) {
+    var p = findProgressStory(id);
+    return p ? p.verification.state : "not_started";
+  }
+
+  var STATE_LABEL = {
+    not_started: "Not started",
+    in_progress: "In progress",
+    submitted: "Submitted",
+    verified: "Verified"
+  };
+
+  function stateDot(stateName) {
+    var color = stateName === "verified" ? "var(--cc-ok)" : (stateName === "not_started" ? "var(--cc-grey-dot)" : "var(--cc-warn-border)");
+    return '<span class="cc-dot" style="background:' + color + '"></span>' + esc(STATE_LABEL[stateName] || stateName);
+  }
+
+  // ---------------- OUTCOMES ----------------
+  function renderOutcomes(container) {
+    var measures = (state.plan.derived && state.plan.derived.measures) || [];
+    var html = '<h1 class="cc-page-title">Outcomes' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">The numbers this project has to move.</div>';
+
+    if (state.route.detail) {
+      var m = measures.find(function (x) { return x.id === state.route.detail; });
+      html += backLink("outcomes");
+      if (!m) {
+        html += '<div class="cc-empty"><strong>Not found</strong>That measure id is not in the plan.</div>';
+      } else {
+        html += '<h2>' + esc(m.id) + '</h2><p>' + esc(m.statement) + '</p>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    if (measures.length === 0) {
+      html += '<div class="cc-empty"><strong>No outcome measures defined yet</strong>' +
+        'The plan does not carry a numeric target for this project. Once one is added to .colaberry/plan.json, it will appear here as a card that drills down to its own detail.</div>';
+    } else {
+      html += '<div class="cc-grid">';
+      measures.forEach(function (m) {
+        html += '<div class="cc-card" data-nav="outcomes" data-detail="' + esc(m.id) + '">' +
+          '<div class="cc-card-label">' + esc(m.id) + '</div>' +
+          '<div class="cc-card-detail">' + esc(m.statement) + '</div></div>';
+      });
+      html += '</div>';
+    }
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- USERS & USE CASE ----------------
+  function renderUsers(container) {
+    var roles = (state.plan.derived && state.plan.derived.roles) || [];
+    var html = '<h1 class="cc-page-title">Users &amp; Use Case' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">Who this is for, taken from the roles named in your own stories.</div>';
+
+    if (state.route.detail) {
+      var role = state.route.detail;
+      var stories = (state.plan.stories || []).filter(function (s) {
+        return (s.narrative || "").toLowerCase().indexOf("as a " + role.toLowerCase()) === 0 ||
+               (s.narrative || "").toLowerCase().indexOf("as the " + role.toLowerCase()) === 0;
+      });
+      html += backLink("users");
+      html += '<h2 style="text-transform:capitalize">' + esc(role) + '</h2>';
+      html += '<table class="cc-table"><thead><tr><th>Story</th><th>Narrative</th></tr></thead><tbody>';
+      stories.forEach(function (s) {
+        html += '<tr><td>' + esc(s.id) + ' — ' + esc(s.title) + '</td><td>' + esc(s.narrative) + '</td></tr>';
+      });
+      if (stories.length === 0) html += '<tr><td colspan="2">No stories narrated for this role.</td></tr>';
+      html += '</tbody></table>';
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    html += '<div class="cc-grid">';
+    roles.forEach(function (role) {
+      var count = (state.plan.stories || []).filter(function (s) {
+        return (s.narrative || "").toLowerCase().indexOf("as a " + role.toLowerCase()) === 0 ||
+               (s.narrative || "").toLowerCase().indexOf("as the " + role.toLowerCase()) === 0;
+      }).length;
+      html += '<div class="cc-card" data-nav="users" data-detail="' + esc(role) + '" style="text-transform:capitalize">' +
+        '<div class="cc-card-label">Role</div>' +
+        '<div class="cc-card-value">' + esc(role) + '</div>' +
+        '<div class="cc-card-detail">' + count + ' stories narrated for this role — click to view</div></div>';
+    });
+    if (roles.length === 0) html += '<div class="cc-empty"><strong>No roles found</strong>No "As a &lt;role&gt;" narratives were found in the plan.</div>';
+    html += '</div>';
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- GUARDRAILS ----------------
+  function renderGuardrails(container) {
+    var guardrails = (state.plan.derived && state.plan.derived.guardrails) || [];
+    var reqs = state.plan.requirements || [];
+    var html = '<h1 class="cc-page-title">Guardrails' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">What must never happen, and whether anything in the build currently enforces it.</div>';
+
+    function fulfillingStories(reqId) {
+      var req = reqs.find(function (r) { return r.id === reqId; });
+      return req ? (req.fulfilled_by || []) : [];
+    }
+
+    if (state.route.detail) {
+      var g = guardrails.find(function (x) { return x.id === state.route.detail; });
+      html += backLink("guardrails");
+      if (!g) {
+        html += '<div class="cc-empty"><strong>Not found</strong></div>';
+      } else {
+        var storyIds = fulfillingStories(g.id);
+        var allVerified = storyIds.length > 0 && storyIds.every(function (id) { return storyState(id) === "verified"; });
+        html += '<h2>' + esc(g.id) + '</h2><p>' + esc(g.statement) + '</p>';
+        html += '<div class="cc-section-title">Enforcement status</div>';
+        if (!allVerified) {
+          html += '<div class="cc-empty"><strong>Not yet enforced</strong>This is a promise the project has made and not yet kept — the stories behind it are not all verified.</div>';
+        }
+        html += '<table class="cc-table"><thead><tr><th>Story</th><th>Status</th></tr></thead><tbody>';
+        storyIds.forEach(function (id) {
+          var s = findStory(id);
+          html += '<tr><td>' + esc(id) + (s ? " — " + esc(s.title) : "") + '</td><td>' + stateDot(storyState(id)) + '</td></tr>';
+        });
+        if (storyIds.length === 0) html += '<tr><td colspan="2">No story currently fulfils this requirement.</td></tr>';
+        html += '</tbody></table>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    if (guardrails.length === 0) {
+      html += '<div class="cc-empty"><strong>No SAFE requirements in the plan</strong>' +
+        'This tab is empty because the plan has no guardrail (SAFE-kind requirement) yet. Worth fixing before building further — ask if this is unexpected.</div>';
+    } else {
+      html += '<div class="cc-grid">';
+      guardrails.forEach(function (g) {
+        var storyIds = fulfillingStories(g.id);
+        var allVerified = storyIds.length > 0 && storyIds.every(function (id) { return storyState(id) === "verified"; });
+        html += '<div class="cc-card" data-nav="guardrails" data-detail="' + esc(g.id) + '">' +
+          '<div class="cc-card-label">' + esc(g.id) + '</div>' +
+          '<div class="cc-card-detail">' + esc(g.statement) + '</div>' +
+          '<div class="cc-card-detail" style="margin-top:10px">' + (allVerified ? stateDot("verified") : '<span class="cc-dot" style="background:var(--cc-grey-dot)"></span>Not yet enforced') + '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- SYSTEMS ----------------
+  function renderSystems(container) {
+    var systems = (state.plan.derived && state.plan.derived.systems) || [];
+    var html = '<h1 class="cc-page-title">Systems' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">What this connects to. Connection status is a fact about the running system, not this repo — every indicator starts grey.</div>';
+
+    if (systems.length === 0) {
+      html += '<div class="cc-empty"><strong>No external systems named yet</strong>' +
+        'The plan does not name an external system this project connects to. Once one is added, it will appear here with a grey "not checked from here" indicator until your own running system reports otherwise.</div>';
+    } else {
+      html += '<div class="cc-grid">';
+      systems.forEach(function (sys) {
+        html += '<div class="cc-card" data-nav="systems" data-detail="' + esc(sys) + '">' +
+          '<div class="cc-card-label">' + esc(sys) + '</div>' +
+          '<div class="cc-card-detail"><span class="cc-dot"></span>Not checked from here</div></div>';
+      });
+      html += '</div>';
+    }
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- PROJECT MANAGEMENT ----------------
+  function renderPM(container) {
+    var releases = state.plan.releases || [];
+    var html = '<h1 class="cc-page-title">Project Management' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">Releases and stories, read from the plan and progress files.</div>';
+
+    if (state.route.detail) {
+      var story = findStory(state.route.detail);
+      html += backLink("pm");
+      if (!story) {
+        html += '<div class="cc-empty"><strong>Not found</strong></div>';
+      } else {
+        var slip = story.due_on !== story.due_baseline_on;
+        html += '<h2>' + esc(story.id) + ' — ' + esc(story.title) + '</h2>';
+        html += '<p>' + esc(story.narrative) + '</p>';
+        html += '<table class="cc-table"><tbody>';
+        html += '<tr><th>Release</th><td>' + esc(story.release) + '</td></tr>';
+        html += '<tr><th>Due (current)</th><td>' + esc(story.due_on) + '</td></tr>';
+        html += '<tr><th>Due (baseline)</th><td>' + esc(story.due_baseline_on) + (slip ? ' <span class="cc-badge must">slipped</span>' : '') + '</td></tr>';
+        html += '<tr><th>Status</th><td>' + stateDot(storyState(story.id)) + '</td></tr>';
+        html += '</tbody></table>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    var minDate = releases.reduce(function (m, r) { return !m || r.starts_on < m ? r.starts_on : m; }, null);
+    var maxDate = releases.reduce(function (m, r) { return !m || r.ends_on > m ? r.ends_on : m; }, null);
+    var span = (new Date(maxDate) - new Date(minDate)) || 1;
+
+    html += '<div class="cc-section-title">Releases</div>';
+    releases.forEach(function (r) {
+      var left = ((new Date(r.starts_on) - new Date(minDate)) / span) * 100;
+      var width = Math.max((((new Date(r.ends_on) - new Date(r.starts_on)) / span) * 100), 2);
+      html += '<div style="margin-bottom:14px">' +
+        '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--cc-text-muted);margin-bottom:4px">' +
+        '<span><strong>' + esc(r.key) + '</strong> ' + esc(r.name) + (r.is_demo_target ? ' <span class="cc-badge should">demo target</span>' : '') + '</span>' +
+        '<span>' + esc(r.starts_on) + ' → ' + esc(r.ends_on) + '</span></div>' +
+        '<div style="background:var(--cc-surface-alt);border:1px solid var(--cc-border);border-radius:999px;height:14px;position:relative">' +
+        '<div style="position:absolute;left:' + left + '%;width:' + width + '%;height:100%;background:linear-gradient(155deg,var(--cc-accent-2),var(--cc-accent));border-radius:999px"></div>' +
+        '</div></div>';
+    });
+
+    html += '<div class="cc-section-title">Tasks</div>';
+    html += '<table class="cc-table"><thead><tr><th>Story</th><th>Release</th><th>Due</th><th>Baseline due</th><th>Status</th></tr></thead><tbody>';
+    (state.plan.stories || []).slice().sort(function (a, b) { return a.due_on < b.due_on ? -1 : 1; }).forEach(function (s) {
+      var slip = s.due_on !== s.due_baseline_on;
+      html += '<tr data-nav="pm" data-detail="' + esc(s.id) + '" style="cursor:pointer">' +
+        '<td>' + esc(s.id) + ' — ' + esc(s.title) + '</td>' +
+        '<td>' + esc(s.release) + '</td>' +
+        '<td>' + esc(s.due_on) + '</td>' +
+        '<td>' + esc(s.due_baseline_on) + (slip ? ' <span class="cc-badge must">slip</span>' : '') + '</td>' +
+        '<td>' + stateDot(storyState(s.id)) + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- AI AGENTS ----------------
+  function renderAgents(container) {
+    var owners = (state.plan.derived && state.plan.derived.owners) || [];
+    var html = '<h1 class="cc-page-title">AI Agents' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">The plan does not carry a scoped agent roster yet. These cards show who owns each story — owners, not scoped AI agents.</div>';
+
+    if (state.route.detail) {
+      var owner = owners.find(function (o) { return o.name === state.route.detail; });
+      html += backLink("agents");
+      if (!owner) {
+        html += '<div class="cc-empty"><strong>Not found</strong></div>';
+      } else {
+        html += '<h2>' + esc(owner.name) + '</h2>';
+        html += '<p><strong>Skills:</strong> no skills registered yet</p>';
+        html += '<p><strong>Runs:</strong> no runs recorded</p>';
+        html += '<table class="cc-table"><thead><tr><th>Story</th><th>Status</th></tr></thead><tbody>';
+        owner.story_ids.forEach(function (id) {
+          var s = findStory(id);
+          html += '<tr><td>' + esc(id) + (s ? " — " + esc(s.title) : "") + '</td><td>' + stateDot(storyState(id)) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    html += '<div class="cc-grid">';
+    owners.forEach(function (o) {
+      html += '<div class="cc-card" data-nav="agents" data-detail="' + esc(o.name) + '">' +
+        '<div class="cc-card-label">Owner</div>' +
+        '<div class="cc-card-value">' + esc(o.name) + '</div>' +
+        '<div class="cc-card-detail">' + o.story_ids.length + ' stories owned — no skills registered yet — no runs recorded</div></div>';
+    });
+    if (owners.length === 0) html += '<div class="cc-empty"><strong>No owners found</strong></div>';
+    html += '</div>';
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  // ---------------- KNOWLEDGE BASE ----------------
+  function renderKB(container) {
+    var reqs = state.plan.requirements || [];
+    var html = '<h1 class="cc-page-title">Knowledge Base' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">Everything the project knows about itself: requirements, stories, and their traceability.</div>';
+
+    if (state.route.detail) {
+      var req = reqs.find(function (r) { return r.id === state.route.detail; });
+      html += backLink("kb");
+      if (!req) {
+        html += '<div class="cc-empty"><strong>Not found</strong></div>';
+      } else {
+        html += '<h2>' + esc(req.id) + ' <span class="cc-badge ' + esc(req.priority) + '">' + esc(req.priority) + '</span></h2>';
+        html += '<p>' + esc(req.statement) + '</p>';
+        html += '<table class="cc-table"><tbody>';
+        html += '<tr><th>Kind</th><td>' + esc(req.kind) + '</td></tr>';
+        html += '<tr><th>Cluster</th><td>' + esc(req.cluster) + '</td></tr>';
+        html += '</tbody></table>';
+        html += '<div class="cc-section-title">Fulfilling stories</div>';
+        html += '<table class="cc-table"><thead><tr><th>Story</th><th>Status</th></tr></thead><tbody>';
+        (req.fulfilled_by || []).forEach(function (id) {
+          var s = findStory(id);
+          html += '<tr><td>' + esc(id) + (s ? " — " + esc(s.title) : "") + '</td><td>' + stateDot(storyState(id)) + '</td></tr>';
+        });
+        if ((req.fulfilled_by || []).length === 0) html += '<tr><td colspan="2">No story currently fulfils this requirement — a real gap.</td></tr>';
+        html += '</tbody></table>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    html += '<div class="cc-section-title">Traceability — requirements to stories</div>';
+    html += '<table class="cc-table"><thead><tr><th>Requirement</th><th>Priority</th><th>Fulfilling stories</th><th>Verified?</th></tr></thead><tbody>';
+    reqs.forEach(function (req) {
+      var storyIds = req.fulfilled_by || [];
+      var allVerified = storyIds.length > 0 && storyIds.every(function (id) { return storyState(id) === "verified"; });
+      var gap = req.priority === "must" && storyIds.length === 0;
+      html += '<tr data-nav="kb" data-detail="' + esc(req.id) + '" style="cursor:pointer' + (gap ? ';background:#fff7f6' : '') + '">' +
+        '<td>' + esc(req.id) + ' — ' + esc(req.statement) + '</td>' +
+        '<td><span class="cc-badge ' + esc(req.priority) + '">' + esc(req.priority) + '</span></td>' +
+        '<td>' + (storyIds.length ? storyIds.join(", ") : '<em>gap — no story yet</em>') + '</td>' +
+        '<td>' + (storyIds.length ? (allVerified ? stateDot("verified") : '<span class="cc-dot"></span>No') : "—") + '</td></tr>';
+    });
+    html += '</tbody></table>';
+
+    html += '<div class="cc-section-title">Ask about this project</div>';
+    html += '<div class="cc-card" style="cursor:default"><div style="display:flex;gap:8px;margin-bottom:10px">' +
+      '<input id="kb-q" placeholder="e.g. what covers REQ-012?" style="flex:1;padding:8px 12px;border:1px solid var(--cc-border);border-radius:8px;font-size:13px" />' +
+      '<button id="kb-ask" style="padding:8px 16px;border:none;border-radius:8px;background:var(--cc-accent);color:#fff;font-weight:700;cursor:pointer">Ask</button>' +
+      '</div><div id="kb-answer" style="font-size:13px;color:var(--cc-text-muted)">Answers are matched from this page\'s own data only — not a general AI. If it can\'t find something here, it says so.</div></div>';
+
+    container.innerHTML = html;
+    wireNav(container);
+
+    document.getElementById("kb-ask").addEventListener("click", answerKbQuestion);
+    document.getElementById("kb-q").addEventListener("keydown", function (e) { if (e.key === "Enter") answerKbQuestion(); });
+  }
+
+  function answerKbQuestion() {
+    var q = document.getElementById("kb-q").value.trim().toLowerCase();
+    var out = document.getElementById("kb-answer");
+    if (!q) { out.textContent = "Type a question first."; return; }
+
+    var reqs = state.plan.requirements || [];
+    var stories = state.plan.stories || [];
+    var hitReq = reqs.find(function (r) { return q.indexOf(r.id.toLowerCase()) >= 0; });
+    var hitStory = stories.find(function (s) { return q.indexOf(s.id.toLowerCase()) >= 0; });
+
+    if (hitReq) {
+      out.innerHTML = '<strong>' + esc(hitReq.id) + '</strong>: ' + esc(hitReq.statement) +
+        ' Fulfilled by: ' + (hitReq.fulfilled_by.join(", ") || "no story yet") +
+        '. <em>Source: Knowledge Base tab.</em>';
+      return;
+    }
+    if (hitStory) {
+      out.innerHTML = '<strong>' + esc(hitStory.id) + '</strong> — ' + esc(hitStory.title) +
+        ', due ' + esc(hitStory.due_on) + ', status: ' + STATE_LABEL[storyState(hitStory.id)] +
+        '. <em>Source: Project Management tab.</em>';
+      return;
+    }
+    var kwHit = reqs.find(function (r) { return r.statement.toLowerCase().indexOf(q) >= 0; });
+    if (kwHit) {
+      out.innerHTML = '<strong>' + esc(kwHit.id) + '</strong>: ' + esc(kwHit.statement) + ' <em>Source: Knowledge Base tab.</em>';
+      return;
+    }
+    out.textContent = "Can't answer that from the data on this page.";
+  }
+
+  // ---------------- DATA MODEL ----------------
+  var DATA_MODEL_TABLES = [
+    { name: "Vault", fields: ["id", "owner_user_id", "created_at", "master_key_envelope_id"], relates: "Owned by a user. Holds many Credentials.", reqs: ["REQ-001", "REQ-007", "REQ-014"] },
+    { name: "MasterKeyEnvelope", fields: ["id", "vault_id", "kdf_params", "wrapped_key", "rotated_at"], relates: "One per Vault; replaced (not re-derived per secret) when the master password changes.", reqs: ["REQ-001", "REQ-008", "REQ-013"] },
+    { name: "RecoveryKey", fields: ["id", "vault_id", "recovery_envelope", "issued_at", "used_at"], relates: "One-time key issued per Vault at creation; consumed on recovery.", reqs: ["REQ-002", "REQ-009"] },
+    { name: "Credential", fields: ["id", "vault_id", "label", "username", "secret_ciphertext", "url", "updated_at"], relates: "Belongs to a Vault.", reqs: ["REQ-003", "REQ-004", "REQ-005"] },
+    { name: "Device", fields: ["id", "vault_id", "device_name", "public_key", "registered_at", "revoked_at"], relates: "Belongs to a Vault; identifies a device with its own key pair for revocation.", reqs: ["REQ-015"] },
+    { name: "CloudStorageLink", fields: ["id", "vault_id", "provider", "provider_account_id", "oauth_token_ref", "linked_at"], relates: "Belongs to a Vault; holds cloud-storage auth separately from vault auth (REQ-012).", reqs: ["REQ-010", "REQ-011", "REQ-012"] },
+    { name: "ShareGrant", fields: ["id", "credential_id", "granted_to", "permissions", "expires_at"], relates: "Grants access to one Credential (or Vault) to another party.", reqs: ["REQ-017"] },
+    { name: "PasswordHealthFinding", fields: ["id", "credential_id", "issue_type", "severity", "detected_at"], relates: "Belongs to a Credential; flags weak or breached passwords.", reqs: ["REQ-018"] }
+  ];
+
+  function renderDataModel(container) {
+    var html = '<h1 class="cc-page-title">Data Model' + sampleFlag() + '</h1>';
+    html += '<div class="cc-page-sub">Derived from the requirements below — a starting point, not the answer. Review before any table is created.</div>';
+
+    if (state.route.detail) {
+      var t = DATA_MODEL_TABLES.find(function (x) { return x.name === state.route.detail; });
+      html += backLink("datamodel");
+      if (!t) {
+        html += '<div class="cc-empty"><strong>Not found</strong></div>';
+      } else {
+        html += '<h2>' + esc(t.name) + '</h2>';
+        html += '<div class="cc-section-title">Fields</div><ul>' + t.fields.map(function (f) { return '<li>' + esc(f) + '</li>'; }).join("") + '</ul>';
+        html += '<div class="cc-section-title">Relationships</div><p>' + esc(t.relates) + '</p>';
+        html += '<div class="cc-section-title">Motivated by</div><p>' + t.reqs.join(", ") + '</p>';
+      }
+      container.innerHTML = html;
+      wireNav(container);
+      return;
+    }
+
+    html += '<div class="cc-grid">';
+    DATA_MODEL_TABLES.forEach(function (t) {
+      html += '<div class="cc-card" data-nav="datamodel" data-detail="' + esc(t.name) + '">' +
+        '<div class="cc-card-label">Table</div>' +
+        '<div class="cc-card-value" style="font-size:18px">' + esc(t.name) + '</div>' +
+        '<div class="cc-card-detail">' + t.fields.length + ' fields — click for detail</div></div>';
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    wireNav(container);
+  }
+
+  var RENDERERS = {
+    overview: renderOverview,
+    outcomes: renderOutcomes,
+    users: renderUsers,
+    guardrails: renderGuardrails,
+    systems: renderSystems,
+    pm: renderPM,
+    agents: renderAgents,
+    kb: renderKB,
+    datamodel: renderDataModel
+  };
+
+  function render() {
+    renderDataStamp();
+    renderNav();
+
+    document.getElementById("cc-btn-sample").className = state.mode === "sample" ? "active" : "";
+    document.getElementById("cc-btn-real").className = state.mode === "real" ? "active" : "";
+    document.getElementById("cc-toggle-thumb").className = "cc-toggle-thumb" + (state.mode === "real" ? " real" : "");
+
+    var container = document.getElementById("cc-content");
+    var tab = TABS.find(function (t) { return t.id === state.route.tab; }) || TABS[0];
+
+    if (!state.plan && !state.loadError) {
+      container.innerHTML = "Loading…";
+      return;
+    }
+
+    if (state.loadError && tab.id !== "overview") {
+      container.innerHTML = '<h1 class="cc-page-title">' + esc(tab.label) + '</h1>' +
+        '<div class="cc-empty"><strong>No data yet</strong>Sync from the portal to generate .colaberry data files.</div>';
+      return;
+    }
+
+    var fn = RENDERERS[tab.id] || renderOverview;
+    fn(container);
+  }
+
+  document.getElementById("cc-btn-sample").addEventListener("click", function () { setMode("sample"); });
+  document.getElementById("cc-btn-real").addEventListener("click", function () { setMode("real"); });
+
+  render();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "project": {
+    "name": "Sifra",
+    "descriptor": "A secure, user-owned password vault evolving into a cross-platform, zero-knowledge digital vault and personal security platform."
+  },
+  "schedule": {
+    "build_start": "2026-09-11",
+    "build_end": "2026-10-01",
+    "demo_day": "2026-10-08",
+    "demo_release_key": "r0"
+  },
+  "derived": {
+    "measures": [],
+    "roles": ["user"],
+    "guardrails": [
+      {
+        "id": "REQ-012",
+        "statement": "The system must separate cloud-storage authentication from vault authentication."
+      }
+    ],
+    "systems": [],
+    "owners": [
+      {
+        "name": "User",
+        "story_ids": ["STORY-001", "STORY-002", "STORY-003", "STORY-004", "STORY-005", "STORY-006", "STORY-007", "STORY-008", "STORY-009", "STORY-010", "STORY-011", "STORY-012", "STORY-013", "STORY-014"]
+      },
+      {
+        "name": "System",
+        "story_ids": ["STORY-015"]
+      }
+    ],
+    "counts": {
+      "agents_by_autonomy": {}
+    }
+  },
+  "requirements": [
+    { "id": "REQ-001", "statement": "The system must allow a user to create a vault with a master password.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-001"] },
+    { "id": "REQ-002", "statement": "The system must generate a one-time recovery key during vault creation.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-001"] },
+    { "id": "REQ-003", "statement": "The system must support adding, viewing, editing, deleting, and searching login credentials.", "kind": "FUNC", "priority": "must", "cluster": "Credential Management", "fulfilled_by": ["STORY-002"] },
+    { "id": "REQ-004", "statement": "The system must generate strong passwords for user credentials.", "kind": "FUNC", "priority": "must", "cluster": "Credential Management", "fulfilled_by": ["STORY-003"] },
+    { "id": "REQ-005", "statement": "The system must allow manual copying of usernames and passwords.", "kind": "FUNC", "priority": "must", "cluster": "Credential Management", "fulfilled_by": ["STORY-002"] },
+    { "id": "REQ-006", "statement": "The system must lock and unlock the vault, rejecting incorrect passwords.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-004"] },
+    { "id": "REQ-007", "statement": "The system must persist encrypted vault data locally without data loss on close/reopen.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-014"] },
+    { "id": "REQ-008", "statement": "The system must allow changing the master password without re-encrypting all secrets.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-005"] },
+    { "id": "REQ-009", "statement": "The system must support vault recovery using the recovery key to establish a new master password.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-006"] },
+    { "id": "REQ-010", "statement": "The system must use Google Drive for encrypted cross-device synchronization.", "kind": "FUNC", "priority": "must", "cluster": "Synchronization", "fulfilled_by": ["STORY-007"] },
+    { "id": "REQ-011", "statement": "The system must use Microsoft OneDrive and Dropbox for encrypted cross-device synchronization after Google Drive.", "kind": "FUNC", "priority": "should", "cluster": "Synchronization", "fulfilled_by": ["STORY-008"] },
+    { "id": "REQ-012", "statement": "The system must separate cloud-storage authentication from vault authentication.", "kind": "SAFE", "priority": "must", "cluster": "Security", "fulfilled_by": ["STORY-013"] },
+    { "id": "REQ-013", "statement": "The system must use established cryptographic libraries and primitives for encryption.", "kind": "CONSTRAINT", "priority": "must", "cluster": "Security", "fulfilled_by": ["STORY-015"] },
+    { "id": "REQ-014", "statement": "The system must support local-first operation with offline usability.", "kind": "FUNC", "priority": "must", "cluster": "Vault Core", "fulfilled_by": ["STORY-014"] },
+    { "id": "REQ-015", "statement": "The system must support device identity and revocation.", "kind": "FUNC", "priority": "should", "cluster": "Device Management", "fulfilled_by": ["STORY-009"] },
+    { "id": "REQ-016", "statement": "The system must support browser integration for credential discovery and autofill.", "kind": "FUNC", "priority": "should", "cluster": "Device Management", "fulfilled_by": ["STORY-010"] },
+    { "id": "REQ-017", "statement": "The system must provide secure sharing of credentials and vaults.", "kind": "FUNC", "priority": "should", "cluster": "Security Insights", "fulfilled_by": ["STORY-012"] },
+    { "id": "REQ-018", "statement": "The system must support password health analysis and breach awareness.", "kind": "FUNC", "priority": "should", "cluster": "Security Insights", "fulfilled_by": ["STORY-011"] }
+  ],
+  "stories": [
+    { "id": "STORY-001", "title": "Create Vault and Generate Recovery Key", "release": "r0", "narrative": "As a user, I want to create a vault with a master password and receive a one-time recovery key.", "acceptance_criteria": [], "due_on": "2026-09-11", "due_baseline_on": "2026-09-11" },
+    { "id": "STORY-013", "title": "Separate Cloud-Storage Authentication from Vault Authentication", "release": "r0", "narrative": "As a user, I want cloud-storage sign-in kept separate from my vault authentication.", "acceptance_criteria": [], "due_on": "2026-09-12", "due_baseline_on": "2026-09-12" },
+    { "id": "STORY-014", "title": "Support Local-First Operation with Offline Usability", "release": "r0", "narrative": "As a user, I want to use my vault fully offline with data persisted locally.", "acceptance_criteria": [], "due_on": "2026-09-13", "due_baseline_on": "2026-09-13" },
+    { "id": "STORY-015", "title": "Establish Trust Spine for Vault Operations", "release": "r0", "narrative": "As the system, I want a trust spine built on established cryptographic primitives underlying all vault operations.", "acceptance_criteria": [], "due_on": "2026-09-14", "due_baseline_on": "2026-09-14" },
+    { "id": "STORY-002", "title": "Add, View, Edit, Delete, and Search Credentials", "release": "r1", "narrative": "As a user, I want to add, view, edit, delete, and search my login credentials.", "acceptance_criteria": [], "due_on": "2026-09-15", "due_baseline_on": "2026-09-15" },
+    { "id": "STORY-003", "title": "Generate Strong Passwords", "release": "r1", "narrative": "As a user, I want the system to generate strong passwords for my credentials.", "acceptance_criteria": [], "due_on": "2026-09-16", "due_baseline_on": "2026-09-16" },
+    { "id": "STORY-004", "title": "Lock and Unlock Vault", "release": "r1", "narrative": "As a user, I want to lock and unlock my vault, with incorrect passwords rejected.", "acceptance_criteria": [], "due_on": "2026-09-16", "due_baseline_on": "2026-09-16" },
+    { "id": "STORY-005", "title": "Change Master Password", "release": "r1", "narrative": "As a user, I want to change my master password without re-encrypting all my secrets.", "acceptance_criteria": [], "due_on": "2026-09-17", "due_baseline_on": "2026-09-17" },
+    { "id": "STORY-006", "title": "Recover Vault with Recovery Key", "release": "r1", "narrative": "As a user, I want to recover my vault using my recovery key if I forget my master password.", "acceptance_criteria": [], "due_on": "2026-09-18", "due_baseline_on": "2026-09-18" },
+    { "id": "STORY-007", "title": "Synchronize Vault with Google Drive", "release": "r1", "narrative": "As a user, I want my vault synchronized across devices using Google Drive.", "acceptance_criteria": [], "due_on": "2026-09-18", "due_baseline_on": "2026-09-18" },
+    { "id": "STORY-008", "title": "Synchronize Vault with OneDrive and Dropbox", "release": "r2", "narrative": "As a user, I want my vault synchronized using OneDrive and Dropbox as well.", "acceptance_criteria": [], "due_on": "2026-09-23", "due_baseline_on": "2026-09-23" },
+    { "id": "STORY-009", "title": "Manage Device Identity and Revocation", "release": "r3", "narrative": "As a user, I want to identify and revoke devices linked to my vault.", "acceptance_criteria": [], "due_on": "2026-09-25", "due_baseline_on": "2026-09-25" },
+    { "id": "STORY-010", "title": "Browser Integration for Credential Autofill", "release": "r3", "narrative": "As a user, I want browser integration to discover and autofill my credentials.", "acceptance_criteria": [], "due_on": "2026-09-27", "due_baseline_on": "2026-09-27" },
+    { "id": "STORY-011", "title": "Analyze Password Health and Breach Awareness", "release": "r4", "narrative": "As a user, I want to see password health analysis and breach awareness for my credentials.", "acceptance_criteria": [], "due_on": "2026-09-29", "due_baseline_on": "2026-09-29" },
+    { "id": "STORY-012", "title": "Secure Sharing of Credentials", "release": "r4", "narrative": "As a user, I want to securely share credentials and vaults with others.", "acceptance_criteria": [], "due_on": "2026-10-01", "due_baseline_on": "2026-10-01" }
+  ],
+  "releases": [
+    { "key": "r0", "name": "Minimum Viable Vault Core", "starts_on": "2026-09-11", "ends_on": "2026-09-14", "story_ids": ["STORY-001", "STORY-013", "STORY-014", "STORY-015"], "is_demo_target": true },
+    { "key": "r1", "name": "Google Drive Synchronization", "starts_on": "2026-09-15", "ends_on": "2026-09-18", "story_ids": ["STORY-002", "STORY-003", "STORY-004", "STORY-005", "STORY-006", "STORY-007"], "is_demo_target": false },
+    { "key": "r2", "name": "Extended Synchronization Providers", "starts_on": "2026-09-23", "ends_on": "2026-09-23", "story_ids": ["STORY-008"], "is_demo_target": false },
+    { "key": "r3", "name": "Device Management and Browser Integration", "starts_on": "2026-09-25", "ends_on": "2026-09-27", "story_ids": ["STORY-009", "STORY-010"], "is_demo_target": false },
+    { "key": "r4", "name": "Security Insights and Secure Sharing", "starts_on": "2026-09-29", "ends_on": "2026-10-01", "story_ids": ["STORY-011", "STORY-012"], "is_demo_target": false }
+  ],
+  "agents": []
+}
