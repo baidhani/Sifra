@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Sifra Vault</title>
+  <style>
+    body { font: 14px system-ui, sans-serif; width: 240px; padding: 12px; }
+    input { width: 100%; box-sizing: border-box; padding: 6px; margin-bottom: 8px; }
+    button { width: 100%; padding: 6px; cursor: pointer; }
+    #status { margin-top: 8px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="lockedView">
+    <label for="password">Vault master password</label>
+    <input type="password" id="password" autocomplete="off" />
+    <button id="unlockButton">Unlock for this session</button>
+  </div>
+  <div id="unlockedView" hidden>
+    <p>Vault unlocked for this browser session.</p>
+    <button id="lockButton">Lock now</button>
+  </div>
+  <div id="status"></div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "com.sifra.nativehost",
+  "description": "Sifra Vault native messaging host (STORY-010 dev build)",
+  "path": "C:\\Users\\firas\\Documents\\Sifra-AI-Project\\src\\Sifra.NativeHost\\bin\\Debug\\net10.0\\Sifra.NativeHost.exe",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://mbaocanhllficgoonagbnjdccemflapa/"
+  ]
+}

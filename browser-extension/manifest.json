@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Sifra Password Vault (dev)",
+  "version": "1.0.0",
+  "description": "STORY-010 walking skeleton: offers and fills credentials from a local Sifra vault, only with explicit consent.",
+  "permissions": ["nativeMessaging", "activeTab", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Sifra Vault"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq9aE8WtDP5JjKJ178CVhAdUmyONBJQsX08y/ABQN1RGHkOsI7caq+3IunHO/pyN2urP9CjsZoc96quXfvVO58DdFakx8lSZtYwbeVXA2bCbaABbmM3UTGshKnQaC1YG6HjktRp0PWg07+hePh2J95x5AgyW9wteg4BqDnXotvyxdjclfaImRKiQ1XpteboagoAzEf0sjmZn5qjE8mtnYpwdhlV/56LXk22E9t3Fm9nqd159k6X8bwWs8iGSVo/ect4CwPv0tJPV/rw2hFw3iy0ov6fjXlT7rRtveOSXoso5j9qWSvQCyj5MYwcFz3MladCYiH8tx0n8ohb59CSw+4QIDAQAB"
+}

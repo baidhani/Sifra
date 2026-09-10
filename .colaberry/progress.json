@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 13,
+    "stories_verified": 14,
     "stories_submitted": 0,
-    "stories_in_progress": 3,
+    "stories_in_progress": 2,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 41,
-    "points_awarded": 1315
+    "criteria_passed": 44,
+    "points_awarded": 1365
   },
   "stories": [
     {
@@ -572,35 +572,56 @@
       "criteria": [
         {
           "text": "Given a browser, when a user visits a login page, then credentials are offered for autofill.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a browser, when a user denies autofill, then credentials are not filled.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Autofill actions are logged.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Autofill/AutofillConsentRequiredException.cs",
+        "src/Sifra.Vault/Autofill/CredentialDomainMismatchException.cs",
+        "src/Sifra.Vault/Autofill/CredentialAutofillService.cs",
+        "tests/Sifra.Vault.Tests/CredentialAutofillServiceTests.cs",
+        "src/Sifra.NativeHost/Sifra.NativeHost.csproj",
+        "src/Sifra.NativeHost/Program.cs",
+        "Sifra.sln",
+        "browser-extension/manifest.json",
+        "browser-extension/background.js",
+        "browser-extension/content.js",
+        "browser-extension/popup.html",
+        "browser-extension/popup.js",
+        "browser-extension/native-host-manifest.json",
+        "browser-extension/test-login-page.html"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.OfferCredentialsForUrl_WithAMatchingCredential_OffersIt",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.OfferCredentialsForUrl_WithNoMatchingCredential_OffersNothing",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_WithConsentGranted_ReturnsTheCredential",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_WithoutConsent_ThrowsAndFillsNothing",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_ForACredentialFromADifferentDomain_ThrowsDomainMismatch",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_ForANonExistentCredentialId_ThrowsDomainMismatchRatherThanExposingExistence",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_WhenDecryptionFails_PropagatesRatherThanSilentlyFailing",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_WithAuditLoggerProvided_LogsWithoutLoggingTheUsernameOrPassword",
+        "Sifra.Vault.Tests.CredentialAutofillServiceTests.FillCredential_WhenConsentDenied_StillLogsTheDenial"
+      ],
+      "notes": "REAL, LIVE-VERIFIED: an actual unpacked Chrome extension talking to a real Sifra.NativeHost.exe process via Chrome's native messaging protocol, against the real default vault (%AppData%\\Sifra). CredentialAutofillService (new, in Sifra.Vault) is a thin decision layer reusing CredentialService/VaultEncryptionService unmodified -- domain matching is exact-host only (documented walking-skeleton simplification, no PSL/subdomain heuristics). Sifra.NativeHost is a new console project implementing Chrome's 4-byte-length-prefixed JSON framing; it never exposes a credential's password in the 'discover' response, only in 'fill', and only after the service's consent+domain checks pass. Live click-through test against a local static page (python http.server on :8787, chosen after discovering port 8000 is reserved by a Windows system service on this machine) with a seeded test credential: (1) offer banner appeared on page visit, (2) clicking Fill populated username/password only after the explicit click, (3) clicking Dismiss on a reload left both fields empty confirming no-consent-no-fill, (4) operations.log shows OfferCredentialsForUrl/FillCredential entries with outcome= but never the username or password value. REAL BUG FOUND AND FIXED during live verification: initial background.js held the unlocked vault password in a plain module-level variable, which MV3 service workers silently lose on their ~30s idle eviction/restart -- by the time the user navigated to the test page after unlocking, the password was already gone and content.js's original silent-return-on-not-ok design hid the failure completely (no error, no banner, nothing in operations.log). Fixed by moving the password into chrome.storage.session (memory-only, survives SW restarts, cleared on browser close -- matches the intended 'session-held, never persisted' security posture better than the original code did) and by making content.js surface a visible 'unlock the extension' banner instead of failing silently. Also hardened background.js's native-message correlation from a single shared pending-callback (would misroute responses under concurrent discover/fill calls) to a FIFO queue, valid because Sifra.NativeHost processes one full request/response cycle per loop iteration with no concurrency on its side. Domain-mismatch and decryption-failure failure paths are proven by the 9 unit tests (not independently re-verified live, since a walking skeleton has no second real domain to test against) rather than the click-through. Native host registered in this machine's HKCU (per-user) registry, not committed -- the manifest.json path is machine-specific and the registration is a one-time local dev-machine step, not code. Extension id (mbaocanhllficgoonagbnjdccemflapa) pinned via an embedded RSA public key in manifest.json so it stays stable across reloads for the native host's allowed_origins; the private key was generated locally via openssl and deliberately not committed or persisted, since it only pins an unpublished dev extension's id and Chrome does not verify signatures for unpacked extensions.",
+      "updated_at": "2026-09-10T04:20:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
+        "verified_at": "2026-09-10T04:20:00.000Z",
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a browser, when a user visits a login page, then credentials are offered for autofill.",
-          "Given a browser, when a user denies autofill, then credentials are not filled.",
-          "Trust: Autofill actions are logged."
-        ]
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
