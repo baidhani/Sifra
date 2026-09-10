@@ -1,19 +1,15 @@
 using System.Text.Json;
 
-namespace Sifra.Vault.Auth;
+namespace Sifra.Vault.Devices;
 
-/// <summary>
-/// Reads and writes the vault access credential file. Separate file from
-/// vault.json (STORY-001) and from anything cloud-related — no code path
-/// here ever reads a cloud token, and no cloud code ever reads this file.
-/// </summary>
-public sealed class VaultAccessCredentialStore
+/// <summary>Persists the device registry (device id -> record). Same atomic-write pattern as every other store in this codebase.</summary>
+public sealed class DeviceRegistryStore
 {
-    private const string FileName = "vault-access-credential.json";
+    private const string FileName = "devices.json";
 
     private readonly string _filePath;
 
-    public VaultAccessCredentialStore(string? dataDirectory = null)
+    public DeviceRegistryStore(string? dataDirectory = null)
     {
         var directory = dataDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -31,29 +27,33 @@ public sealed class VaultAccessCredentialStore
         _filePath = Path.Combine(directory, FileName);
     }
 
-    public bool Exists() => File.Exists(_filePath);
-
-    public VaultAccessCredentialRecord? Load()
+    public Dictionary<string, DeviceRecord> LoadAll()
     {
-        if (!Exists())
+        if (!File.Exists(_filePath))
         {
-            return null;
+            return new Dictionary<string, DeviceRecord>();
         }
 
         try
         {
             var json = File.ReadAllText(_filePath);
-            return JsonSerializer.Deserialize<VaultAccessCredentialRecord>(json);
+            return JsonSerializer.Deserialize<Dictionary<string, DeviceRecord>>(json) ?? new Dictionary<string, DeviceRecord>();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new VaultStorageException($"Could not read vault access credential file '{_filePath}'.", ex);
+            throw new VaultStorageException($"Could not read device registry file '{_filePath}'.", ex);
         }
     }
 
-    public void Save(VaultAccessCredentialRecord record)
+    public DeviceRecord? Load(string deviceId) =>
+        LoadAll().TryGetValue(deviceId, out var record) ? record : null;
+
+    public void Save(DeviceRecord record)
     {
-        var json = JsonSerializer.Serialize(record);
+        var all = LoadAll();
+        all[record.DeviceId] = record;
+
+        var json = JsonSerializer.Serialize(all);
         var tempFilePath = _filePath + ".tmp";
 
         try
@@ -63,7 +63,7 @@ public sealed class VaultAccessCredentialStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            throw new VaultStorageException($"Could not write vault access credential file '{_filePath}'.", ex);
+            throw new VaultStorageException($"Could not write device registry file '{_filePath}'.", ex);
         }
     }
 }

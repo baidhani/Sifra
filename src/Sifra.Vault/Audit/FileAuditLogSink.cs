@@ -34,7 +34,7 @@ public sealed class FileAuditLogSink : IAuditLogSink
                 File.AppendAllText(_filePath, line);
             }
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new AuditSinkUnavailableException($"Could not write audit log entry to '{_filePath}'.", ex);
         }

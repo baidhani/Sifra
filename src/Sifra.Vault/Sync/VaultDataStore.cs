@@ -23,7 +23,7 @@ public sealed class VaultDataStore
         {
             Directory.CreateDirectory(directory);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not create vault storage directory '{directory}'.", ex);
         }
@@ -43,7 +43,7 @@ public sealed class VaultDataStore
             var json = File.ReadAllText(_filePath);
             return JsonSerializer.Deserialize<List<VaultDataItem>>(json) ?? new List<VaultDataItem>();
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not read vault data file '{_filePath}'.", ex);
         }
@@ -66,7 +66,7 @@ public sealed class VaultDataStore
             File.WriteAllText(tempFilePath, json);
             File.Move(tempFilePath, _filePath, overwrite: true);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not write vault data file '{_filePath}'.", ex);
         }

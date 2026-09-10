@@ -3,6 +3,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Devices;
 using Sifra.Vault.Dropbox;
 using Sifra.Vault.GoogleDrive;
 using Sifra.Vault.OneDrive;
@@ -339,6 +340,42 @@ else
         Console.WriteLine($"Live Dropbox demo did not complete: {ex.GetType().Name}: {ex.Message}");
     }
 }
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-009: manage device identity and revocation ---");
+
+var deviceIdentity = new DeviceIdentityService(new DeviceRegistryStore(dataDirectory), auditLogger);
+var (demoDeviceId, demoDeviceSecret) = deviceIdentity.EnrollDevice("Firas's Laptop");
+Console.WriteLine($"Enrolled device {demoDeviceId}.");
+
+deviceIdentity.VerifyDeviceAccess(demoDeviceId, demoDeviceSecret);
+Console.WriteLine("Device access verified before revocation.");
+
+try
+{
+    deviceIdentity.VerifyDeviceAccess(demoDeviceId, "an-attacker-guessed-this-secret");
+}
+catch (InvalidDeviceSecretException ex)
+{
+    Console.WriteLine($"Spoofed device (wrong secret) correctly refused: {ex.Message}");
+}
+
+deviceIdentity.RevokeDevice(demoDeviceId);
+Console.WriteLine("Device revoked.");
+
+try
+{
+    deviceIdentity.VerifyDeviceAccess(demoDeviceId, demoDeviceSecret);
+}
+catch (DeviceRevokedException ex)
+{
+    Console.WriteLine($"Revoked device correctly denied access: {ex.Message}");
+}
+
+deviceIdentity.ReEnrollDevice(demoDeviceId, demoDeviceSecret);
+Console.WriteLine("Device re-enrolled.");
+deviceIdentity.VerifyDeviceAccess(demoDeviceId, demoDeviceSecret);
+Console.WriteLine("Device access restored after re-enrollment.");
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");

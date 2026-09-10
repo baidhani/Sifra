@@ -23,7 +23,7 @@ public sealed class VaultMasterKeyStore
         {
             Directory.CreateDirectory(directory);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not create vault storage directory '{directory}'.", ex);
         }
@@ -43,7 +43,7 @@ public sealed class VaultMasterKeyStore
             var json = File.ReadAllText(_filePath);
             return JsonSerializer.Deserialize<Dictionary<string, VaultMasterKeySlot>>(json) ?? new Dictionary<string, VaultMasterKeySlot>();
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not read vault master key file '{_filePath}'.", ex);
         }
@@ -71,7 +71,7 @@ public sealed class VaultMasterKeyStore
             File.WriteAllText(tempFilePath, json);
             File.Move(tempFilePath, _filePath, overwrite: true);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             throw new VaultStorageException($"Could not write vault master key file '{_filePath}'.", ex);
         }
