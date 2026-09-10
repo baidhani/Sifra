@@ -616,10 +616,10 @@
         "state": "verified",
         "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": "2026-09-10T04:20:00.000Z",
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
+        "verified_at": "2026-09-10T04:16:05.625Z",
+        "commit_sha": "a9b4cd1478496e92ff36a18128d0bdc273c9849b",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/a9b4cd1478496e92ff36a18128d0bdc273c9849b",
+        "commit_at": "2026-09-10T04:15:47Z",
         "points_awarded": 88,
         "outstanding": []
       }
