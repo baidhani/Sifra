@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 11,
+    "stories_verified": 12,
     "stories_submitted": 0,
-    "stories_in_progress": 5,
+    "stories_in_progress": 4,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 35,
-    "points_awarded": 1215
+    "criteria_passed": 38,
+    "points_awarded": 1265
   },
   "stories": [
     {
@@ -491,19 +491,15 @@
       "notes": "Split verification, deliberately: Dropbox is fully LIVE-VERIFIED (real OAuth via PKCE -- no app secret needed, real upload confirmed independently via a separate script with its own OAuth session, file exists in the user's real Dropbox at /sifra-vault-sync.json, 288 bytes). OneDrive is REAL, COMPLETE code (OneDriveAuthProvider via MSAL public-client flow, OneDriveSyncProvider via Microsoft Graph REST calls scoped to Files.ReadWrite.AppFolder, upserts by path) and fully unit-tested (8 tests against a fake IOneDriveApiClient), but NOT verified against the live Microsoft Graph API -- blocked by a genuine external constraint: this Microsoft account is not eligible for a Microsoft 365 Developer Program sandbox tenant (explicit 'you don't currently qualify' response), and the Azure free-tier signup path was not attempted further given the friction already spent. The user explicitly agreed to accept this split rather than block the whole story. Left the OneDrive upload criterion (criterion 1) UNTICKED on purpose -- the code is believed correct and is well-tested, but 'uploaded' has not actually been observed happening against the real service, and ticking it anyway would overstate what has been proven, contrary to this project's standard. The logging criterion is ticked for both providers since the actual call path (VaultDataService.SyncNow -> AuditLogger) is provider-agnostic and has now been proven twice with real providers (Google Drive, STORY-007; Dropbox, this story) -- OneDrive's identical wiring is covered by unit tests even though its live upload is not. Both providers reuse Sifra.Vault.Crypto.VaultEncryptionService (STORY-002/005/006) and ICloudAuthProvider/ICloudSyncProvider (STORY-013/014) with zero changes to those files. Revisit: tick criterion 1 once OneDrive is live-verified (new Azure tenant, or eligibility resolves) -- do not tick it preemptively. UPDATE: at the user's explicit request, the OneDrive criterion above was ticked despite not being live-verified, in order to unblock downstream work gated on this story completing. This is a deliberate, informed exception to the project's usual 'only tick what is actually proven' rule -- the user made the call knowingly, with intent to circle back and complete real live verification once Azure tenant access is available. Flagging clearly: the OneDrive upload path has still never been observed succeeding against the real Microsoft Graph API. Follow-up owed: get a usable Azure AD tenant, run the same live-verification flow already used for Google Drive and Dropbox, and confirm before treating this as settled.",
       "updated_at": "2026-09-10T00:57:52.573Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
-        "commit_sha": null,
-        "commit_url": null,
-        "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a vault, when synchronized with OneDrive, then data is encrypted and uploaded.",
-          "Given a vault, when synchronized with Dropbox, then data is encrypted and uploaded.",
-          "Trust: Synchronization actions are logged for both providers."
-        ]
+        "verified_at": "2026-09-10T00:58:14.074Z",
+        "commit_sha": "c6710eb861dbe30ed694f51f601913d6c04c2e89",
+        "commit_url": "https://github.com/baidhani/Sifra/commit/c6710eb861dbe30ed694f51f601913d6c04c2e89",
+        "commit_at": "2026-09-10T00:52:55Z",
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
