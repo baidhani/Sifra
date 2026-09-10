@@ -7,7 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Dropbox.Api" Version="7.2.0" />
     <PackageReference Include="Google.Apis.Drive.v3" Version="1.76.0.4252" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.88.0" />
     <PackageReference Include="TextCopy" Version="6.2.1" />
   </ItemGroup>
 

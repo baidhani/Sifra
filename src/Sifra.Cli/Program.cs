@@ -3,7 +3,9 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Dropbox;
 using Sifra.Vault.GoogleDrive;
+using Sifra.Vault.OneDrive;
 using Sifra.Vault.Passwords;
 using Sifra.Vault.Session;
 using Sifra.Vault.Sync;
@@ -290,6 +292,55 @@ else
 }
 
 Console.WriteLine();
+Console.WriteLine("--- STORY-008: synchronize vault with OneDrive and Dropbox ---");
+Console.WriteLine("OneDrive: OneDriveSyncProvider/OneDriveAuthProvider are built and unit-tested against a fake");
+Console.WriteLine("(no Azure tenant was available for this account — flagged as unverified against the real service).");
+
+var dropboxSecretsFile = FindDropboxSecretsFile();
+if (dropboxSecretsFile is null)
+{
+    Console.WriteLine("No .secrets/dropbox.json found — skipping the live Dropbox demo.");
+}
+else
+{
+    using var dropboxSecretsDoc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(dropboxSecretsFile));
+    var dropboxAppKey = dropboxSecretsDoc.RootElement.GetProperty("appKey").GetString()!;
+
+    var dropboxAuth = new DropboxAuthProvider(dropboxAppKey);
+
+    Console.WriteLine("Opening your browser to sign in to Dropbox...");
+    try
+    {
+        dropboxAuth.SignIn("dropbox-test-user");
+        Console.WriteLine($"Dropbox sign-in succeeded. Connected: {dropboxAuth.IsAuthenticated}");
+
+        using var dropboxApiClient = new RealDropboxApiClient(dropboxAuth.AccessToken!);
+        var dropboxSyncProvider = new DropboxSyncProvider(
+            dropboxApiClient,
+            new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)),
+            dropboxAuth,
+            "recovered-password-456");
+
+        var dropboxDataService = new VaultDataService(
+            new VaultDataStore(dataDirectory),
+            new OfflineChangeQueueStore(dataDirectory),
+            dropboxSyncProvider,
+            auditLogger);
+
+        dropboxDataService.Edit(new VaultDataItem("dropbox-sync-demo", "real Dropbox sync test", DateTimeOffset.UtcNow));
+        Console.WriteLine($"Queued for sync: {dropboxDataService.PendingChanges().Count} pending change(s)");
+
+        dropboxDataService.SyncNow();
+        Console.WriteLine("Synced to REAL Dropbox successfully.");
+        Console.WriteLine($"Pending changes remaining: {dropboxDataService.PendingChanges().Count}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Live Dropbox demo did not complete: {ex.GetType().Name}: {ex.Message}");
+    }
+}
+
+Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
 var operationsLog = File.ReadAllLines(operationsLogPath);
 Console.WriteLine($"{operationsLog.Length} operation(s) recorded in {operationsLogPath}:");
@@ -311,12 +362,16 @@ catch (AuditLoggingFailedException ex)
     Console.WriteLine($"Admin was alerted: \"{adminAlerts.Alerts[^1]}\"");
 }
 
-static string? FindGoogleOAuthSecretsFile()
+static string? FindGoogleOAuthSecretsFile() => FindSecretsFile("google-oauth.json");
+
+static string? FindDropboxSecretsFile() => FindSecretsFile("dropbox.json");
+
+static string? FindSecretsFile(string fileName)
 {
     var dir = new DirectoryInfo(AppContext.BaseDirectory);
     for (int i = 0; i < 8 && dir is not null; i++)
     {
-        var candidate = Path.Combine(dir.FullName, ".secrets", "google-oauth.json");
+        var candidate = Path.Combine(dir.FullName, ".secrets", fileName);
         if (File.Exists(candidate))
         {
             return candidate;
