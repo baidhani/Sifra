@@ -7,6 +7,7 @@ using Sifra.Vault.Devices;
 using Sifra.Vault.Dropbox;
 using Sifra.Vault.GoogleDrive;
 using Sifra.Vault.Health;
+using Sifra.Vault.Sharing;
 using Sifra.Vault.OneDrive;
 using Sifra.Vault.Passwords;
 using Sifra.Vault.Session;
@@ -403,6 +404,42 @@ foreach (var report in breachReports)
 
 credentials.Delete(weakDemoCredentialId); // tidy up
 credentials.Delete(strongDemoCredentialId);
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-012: share a credential securely ---");
+
+var sharingDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Shared Wi-Fi", "guest", "guest-network-pass", null);
+var sharedCredentialService = new SharedCredentialService(credentials, new ShareRegistryStore(dataDirectory), auditLogger);
+
+const string recipientPassphrase = "tell-alice-this-out-of-band";
+var shareId = sharedCredentialService.CreateShare(healthDemoVaultCredential, sharingDemoCredentialId, "alice", recipientPassphrase);
+Console.WriteLine($"Shared credential. Share id: {shareId} (recipient: alice)");
+
+var acceptedShare = sharedCredentialService.AcceptShare(shareId, recipientPassphrase);
+Console.WriteLine($"Recipient accepted share: label=\"{acceptedShare.Label}\" username=\"{acceptedShare.Username}\"");
+
+try
+{
+    sharedCredentialService.AcceptShare(shareId, "wrong-passphrase");
+}
+catch (VaultDecryptionFailedException ex)
+{
+    Console.WriteLine($"Accept with wrong passphrase correctly refused: {ex.Message}");
+}
+
+sharedCredentialService.RevokeShare(shareId);
+Console.WriteLine("Share revoked.");
+
+try
+{
+    sharedCredentialService.AcceptShare(shareId, recipientPassphrase);
+}
+catch (ShareRevokedException ex)
+{
+    Console.WriteLine($"Recipient access after revocation correctly refused: {ex.Message}");
+}
+
+credentials.Delete(sharingDemoCredentialId); // tidy up
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");

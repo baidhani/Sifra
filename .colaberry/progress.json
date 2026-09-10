@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 15,
+    "stories_verified": 16,
     "stories_submitted": 0,
-    "stories_in_progress": 1,
+    "stories_in_progress": 0,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 47,
-    "points_awarded": 1415
+    "criteria_passed": 50,
+    "points_awarded": 1465
   },
   "stories": [
     {
@@ -694,35 +694,50 @@
       "criteria": [
         {
           "text": "Given a credential, when shared, then the recipient receives an encrypted copy.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a shared credential, when revoked, then the recipient loses access.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Sharing actions are logged.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Sharing/ShareNotFoundException.cs",
+        "src/Sifra.Vault/Sharing/ShareRevokedException.cs",
+        "src/Sifra.Vault/Sharing/ShareRecord.cs",
+        "src/Sifra.Vault/Sharing/ShareRegistryStore.cs",
+        "src/Sifra.Vault/Sharing/SharedCredentialView.cs",
+        "src/Sifra.Vault/Sharing/SharedCredentialService.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/SharedCredentialServiceTests.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.CreateShare_ThenAccept_TheRecipientReceivesAnEncryptedCopy",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.AcceptShare_WithTheWrongPassphrase_ThrowsRatherThanReturningGarbage",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.CreateShare_ForANonExistentCredential_ThrowsInsteadOfSharingNothing",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.RevokeShare_ThenAccept_TheRecipientLosesAccess",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.RevokeShare_CalledTwice_IsIdempotent",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.RevokeShare_ForANonExistentShare_ThrowsShareNotFound",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.AcceptShare_ForANonExistentShare_ThrowsShareNotFound",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.SharingActions_AreLoggedWithoutExposingThePassphraseOrTheCredentialSecret",
+        "Sifra.Vault.Tests.SharedCredentialServiceTests.AcceptShare_AfterRevocation_StillLogsTheDeniedAttempt"
+      ],
+      "notes": "Design decision flagged and confirmed with the user before building, since this app has no multi-user/account system to hang 'recipient' off of: a share re-encrypts the credential under a key derived (PBKDF2-SHA256, 210k iterations, same as VaultEncryptionService's KEK derivation) from a passphrase the recipient is told out of band -- never stored or transmitted by this service -- and the encrypted bundle is persisted in a new ShareRegistryStore, keyed by a random share id. AcceptShare (the recipient-side operation, modeled as another local SharedCredentialService instance -- e.g. another device or Sifra install, not a new account system) is the checkpoint that makes revocation real: it checks the registry's Revoked flag before decrypting, the same idiom as device revocation (STORY-009). Documented explicitly, including in ShareRevokedException's own doc comment: this cannot un-share plaintext a recipient may have already copied elsewhere -- no purely offline scheme can, and this class does not claim otherwise. RevokeShare is idempotent (verified by test). CreateShare reuses CredentialService.GetById unmodified for the vault-side decrypt; the recipient never needs the vault credential itself, only the share id and passphrase. Confirmed via test that the on-disk share-registry.json contains no plaintext (username/password only ever present as AES-GCM ciphertext) and that every audit log line (CreateShare/AcceptShare/RevokeShare) carries only share id, recipient label, and outcome -- never the passphrase or the credential's secret. Live verification: a throwaway script exercising the exact code added to Sifra.Cli/Program.cs's new STORY-012 section (inserted after STORY-011's) ran the full flow against a real temp vault -- share created, accepted with the correct passphrase, wrong-passphrase correctly refused, revoked, and post-revocation access correctly refused -- with the resulting share-registry.json and operations.log inspected directly to confirm no plaintext leak. The CLI's own end-to-end dotnet run could not be exercised directly this session for the same reason as STORY-011 (earlier sections require interactive OAuth consent that blocks non-interactive execution); the added section's code is identical and was proven live via the isolated script instead.",
+      "updated_at": "2026-09-10T05:35:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
+        "verified_at": "2026-09-10T05:35:00.000Z",
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a credential, when shared, then the recipient receives an encrypted copy.",
-          "Given a shared credential, when revoked, then the recipient loses access.",
-          "Trust: Sharing actions are logged."
-        ]
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {
