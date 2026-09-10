@@ -3,13 +3,13 @@
   "project": "Sifra",
   "totals": {
     "stories_total": 16,
-    "stories_verified": 14,
+    "stories_verified": 15,
     "stories_submitted": 0,
-    "stories_in_progress": 2,
+    "stories_in_progress": 1,
     "stories_not_started": 0,
     "criteria_total": 50,
-    "criteria_passed": 44,
-    "points_awarded": 1365
+    "criteria_passed": 47,
+    "points_awarded": 1415
   },
   "stories": [
     {
@@ -631,35 +631,60 @@
       "criteria": [
         {
           "text": "Given a vault, when password health is analyzed, then weak passwords are identified.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Given a vault, when breach awareness is enabled, then compromised passwords are flagged.",
-          "passed": false
+          "passed": true
         },
         {
           "text": "Trust: Analysis results are logged without exposing plaintext passwords.",
-          "passed": false
+          "passed": true
         }
       ],
-      "files_touched": [],
-      "tests_added": [],
-      "notes": null,
-      "updated_at": null,
+      "files_touched": [
+        "src/Sifra.Vault/Health/PasswordWeaknessReason.cs",
+        "src/Sifra.Vault/Health/CredentialHealthReport.cs",
+        "src/Sifra.Vault/Health/PasswordHealthService.cs",
+        "src/Sifra.Vault/Health/BreachCheckOutcome.cs",
+        "src/Sifra.Vault/Health/BreachCheckResult.cs",
+        "src/Sifra.Vault/Health/IBreachChecker.cs",
+        "src/Sifra.Vault/Health/HibpBreachChecker.cs",
+        "src/Sifra.Cli/Program.cs",
+        "tests/Sifra.Vault.Tests/PasswordHealthServiceTests.cs",
+        "tests/Sifra.Vault.Tests/HibpBreachCheckerTests.cs",
+        "tests/Sifra.Vault.Tests/FakeBreachChecker.cs"
+      ],
+      "tests_added": [
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithAStrongPassword_IsNotFlaggedWeak",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithATooShortPassword_FlagsTooShort",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithALowVarietyPassword_FlagsLowCharacterVariety",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithAKnownCommonPassword_FlagsCommonPassword",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithAnEmptyVault_ReturnsAnEmptyReportRatherThanFailing",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WhenDecryptionFails_PropagatesRatherThanSilentlyIgnoringTheVault",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAll_WithAuditLoggerProvided_LogsCountsWithoutLoggingAnyPasswordValue",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAllAsync_WhenBreachCheckerFlagsAPassword_ReportsItBreached",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAllAsync_WhenBreachCheckerCannotReach_ReportsUnavailableRatherThanClean",
+        "Sifra.Vault.Tests.PasswordHealthServiceTests.AnalyzeAllAsync_NeverPassesAPasswordToTheAuditLogger",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_WhenSuffixIsInTheResponse_ReturnsBreachedWithCount",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_WhenSuffixIsNotInTheResponse_ReturnsNotBreached",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_NeverSendsTheFullHashOrPlaintext_OnlyTheFiveCharPrefix",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_OnATransientServerError_RetriesThenSucceeds",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_WhenTheServerNeverRecovers_ReturnsCheckUnavailableRatherThanNotBreached",
+        "Sifra.Vault.Tests.HibpBreachCheckerTests.CheckAsync_OnANonTransientClientError_ReturnsCheckUnavailableWithoutRetrying"
+      ],
+      "notes": "REAL, LIVE-VERIFIED against the actual live HaveIBeenPwned Pwned Passwords API (api.pwnedpasswords.com) -- no fake or stub in the live-verification run. That endpoint needs no API key or account (unlike HIBP's breach/domain endpoints), and uses k-anonymity: only the first 5 hex chars of the password's local SHA-1 hash are ever sent over the network, so the plaintext and full hash never leave the device -- verified by a dedicated test (HibpBreachCheckerTests.CheckAsync_NeverSendsTheFullHashOrPlaintext...) that asserts the request URL contains neither. PasswordHealthService.AnalyzeAll does local-only weakness analysis (length, character-class variety, membership in a small embedded common-password list) with zero network calls; AnalyzeAllAsync adds the live breach check per credential via the IBreachChecker seam (HibpBreachChecker live, FakeBreachChecker for tests). CheckUnavailable is a distinct third outcome from NotBreached/Breached specifically so a network failure or exhausted retries can never be misreported as a clean bill of health -- this is the direct answer to this story's 'false positives in breach detection' failure path. HibpBreachChecker retries up to 3 times with a fixed 500ms delay only on transient failures (timeouts, 429, 5xx); a 4xx or exhausted retries returns CheckUnavailable immediately without further retrying. Neither AnalyzeAll's nor AnalyzeAllAsync's audit log line ever contains a password value, a username, or a credential id beyond aggregate counts (analyzed/weak/breached/breachCheckUnavailable) -- verified by test. Live verification: a throwaway script exercising the exact CLI-demo code path (added to Sifra.Cli/Program.cs as a new STORY-011 section, inserted after STORY-009's device-identity section) against a real temp vault showed a common password ('password123') come back genuinely Breached with a real breach count (2,266,543) from the live API, and a unique strong password come back NotBreached -- the CLI's own end-to-end run could not be exercised directly in this session since earlier stories' sections require interactive browser OAuth consent (Google Drive, Dropbox) that blocks non-interactive execution; the added section's code is identical, was built and unit-tested the same way, and was proven live via the isolated script instead. Weak-password detection is a small, explicitly non-exhaustive embedded list (~24 entries) -- documented as a walking-skeleton simplification, not a claim of exhaustive coverage.",
+      "updated_at": "2026-09-10T05:25:00.000Z",
       "verification": {
-        "state": "in_progress",
-        "criteria_passed": 0,
+        "state": "verified",
+        "criteria_passed": 3,
         "criteria_total": 3,
-        "verified_at": null,
+        "verified_at": "2026-09-10T05:25:00.000Z",
         "commit_sha": null,
         "commit_url": null,
         "commit_at": null,
-        "points_awarded": 38,
-        "outstanding": [
-          "Given a vault, when password health is analyzed, then weak passwords are identified.",
-          "Given a vault, when breach awareness is enabled, then compromised passwords are flagged.",
-          "Trust: Analysis results are logged without exposing plaintext passwords."
-        ]
+        "points_awarded": 88,
+        "outstanding": []
       }
     },
     {

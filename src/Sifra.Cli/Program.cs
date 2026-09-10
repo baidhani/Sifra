@@ -6,6 +6,7 @@ using Sifra.Vault.Crypto;
 using Sifra.Vault.Devices;
 using Sifra.Vault.Dropbox;
 using Sifra.Vault.GoogleDrive;
+using Sifra.Vault.Health;
 using Sifra.Vault.OneDrive;
 using Sifra.Vault.Passwords;
 using Sifra.Vault.Session;
@@ -376,6 +377,32 @@ deviceIdentity.ReEnrollDevice(demoDeviceId, demoDeviceSecret);
 Console.WriteLine("Device re-enrolled.");
 deviceIdentity.VerifyDeviceAccess(demoDeviceId, demoDeviceSecret);
 Console.WriteLine("Device access restored after re-enrollment.");
+
+Console.WriteLine();
+Console.WriteLine("--- STORY-011: analyze password health and breach awareness ---");
+
+const string healthDemoVaultCredential = "recovered-password-456"; // the password active at this point in the demo (post STORY-006 recovery)
+var weakDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Weak Example", "demo", "password123", null);
+var strongDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Strong Example", "demo", "Xk7#mQ9!vL2$pR4wZ8@nB6", null);
+
+var healthService = new PasswordHealthService(credentials, auditLogger);
+var localReports = healthService.AnalyzeAll(healthDemoVaultCredential);
+Console.WriteLine($"Local analysis (no network): {localReports.Count} credential(s) analyzed.");
+foreach (var report in localReports)
+{
+    Console.WriteLine($"  {report.Label}: weak={report.IsWeak} reasons=[{string.Join(",", report.Reasons)}]");
+}
+
+Console.WriteLine("Enabling breach awareness (live check against api.pwnedpasswords.com, k-anonymity — plaintext never leaves this device)...");
+var breachChecker = new HibpBreachChecker(new HttpClient());
+var breachReports = await healthService.AnalyzeAllAsync(healthDemoVaultCredential, breachChecker, CancellationToken.None);
+foreach (var report in breachReports)
+{
+    Console.WriteLine($"  {report.Label}: breachOutcome={report.BreachOutcome} breachCount={report.BreachCount}");
+}
+
+credentials.Delete(weakDemoCredentialId); // tidy up
+credentials.Delete(strongDemoCredentialId);
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-015: trust spine — every operation above was logged ---");
