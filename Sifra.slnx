@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Sifra.Cli/Sifra.Cli.csproj" />
+    <Project Path="src/Sifra.Desktop/Sifra.Desktop.csproj" />
     <Project Path="src/Sifra.NativeHost/Sifra.NativeHost.csproj" />
     <Project Path="src/Sifra.Vault/Sifra.Vault.csproj" />
   </Folder>

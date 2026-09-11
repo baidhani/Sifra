@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Cool, security-oriented light theme; not a simple inversion of Dark. -->
+  <Color x:Key="Sifra.Theme.Window">#F8FAFF</Color>
+  <Color x:Key="Sifra.Theme.Sidebar">#F3F7FF</Color>
+  <Color x:Key="Sifra.Theme.Surface">#FFFFFF</Color>
+  <Color x:Key="Sifra.Theme.SurfaceElevated">#FFFFFF</Color>
+  <Color x:Key="Sifra.Theme.Card">#F4F8FF</Color>
+  <Color x:Key="Sifra.Theme.TextPrimary">#0F172A</Color>
+  <Color x:Key="Sifra.Theme.TextSecondary">#475569</Color>
+  <Color x:Key="Sifra.Theme.Border">#E2E8F0</Color>
+  <Color x:Key="Sifra.Theme.Hover">#EAF2FF</Color>
+  <Color x:Key="Sifra.Theme.Selected">#E3EEFF</Color>
+  <Color x:Key="Sifra.Theme.SelectedText">#0A6CFF</Color>
+  <Color x:Key="Sifra.Theme.Input">#FFFFFF</Color>
+
+  <SolidColorBrush x:Key="Sifra.WindowBrush" Color="{StaticResource Sifra.Theme.Window}"/>
+  <SolidColorBrush x:Key="Sifra.SidebarBrush" Color="{StaticResource Sifra.Theme.Sidebar}"/>
+  <SolidColorBrush x:Key="Sifra.SurfaceBrush" Color="{StaticResource Sifra.Theme.Surface}"/>
+  <SolidColorBrush x:Key="Sifra.SurfaceElevatedBrush" Color="{StaticResource Sifra.Theme.SurfaceElevated}"/>
+  <SolidColorBrush x:Key="Sifra.CardBrush" Color="{StaticResource Sifra.Theme.Card}"/>
+  <SolidColorBrush x:Key="Sifra.TextPrimaryBrush" Color="{StaticResource Sifra.Theme.TextPrimary}"/>
+  <SolidColorBrush x:Key="Sifra.TextSecondaryBrush" Color="{StaticResource Sifra.Theme.TextSecondary}"/>
+  <SolidColorBrush x:Key="Sifra.BorderBrush" Color="{StaticResource Sifra.Theme.Border}"/>
+  <SolidColorBrush x:Key="Sifra.HoverBrush" Color="{StaticResource Sifra.Theme.Hover}"/>
+  <SolidColorBrush x:Key="Sifra.SelectedBrush" Color="{StaticResource Sifra.Theme.Selected}"/>
+  <SolidColorBrush x:Key="Sifra.SelectedTextBrush" Color="{StaticResource Sifra.Theme.SelectedText}"/>
+  <SolidColorBrush x:Key="Sifra.InputBrush" Color="{StaticResource Sifra.Theme.Input}"/>
+</ResourceDictionary>

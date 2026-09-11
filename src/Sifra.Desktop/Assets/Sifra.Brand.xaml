@@ -1,0 +1,19 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Shared Sifra brand/status colors. Theme dictionaries supply surfaces/text/borders. -->
+  <Color x:Key="Sifra.Brand.Primary">#0A6CFF</Color>
+  <Color x:Key="Sifra.Brand.PrimaryDark">#0052CC</Color>
+  <Color x:Key="Sifra.Brand.PrimaryLight">#60C6FF</Color>
+  <Color x:Key="Sifra.Brand.Accent">#00D4FF</Color>
+  <Color x:Key="Sifra.Status.Success">#16A34A</Color>
+  <Color x:Key="Sifra.Status.Warning">#D97706</Color>
+  <Color x:Key="Sifra.Status.Error">#DC2626</Color>
+  <Color x:Key="Sifra.Status.Info">#2563EB</Color>
+
+  <SolidColorBrush x:Key="Sifra.Brand.PrimaryBrush" Color="{StaticResource Sifra.Brand.Primary}"/>
+  <SolidColorBrush x:Key="Sifra.Brand.AccentBrush" Color="{StaticResource Sifra.Brand.Accent}"/>
+  <SolidColorBrush x:Key="Sifra.Status.SuccessBrush" Color="{StaticResource Sifra.Status.Success}"/>
+  <SolidColorBrush x:Key="Sifra.Status.WarningBrush" Color="{StaticResource Sifra.Status.Warning}"/>
+  <SolidColorBrush x:Key="Sifra.Status.ErrorBrush" Color="{StaticResource Sifra.Status.Error}"/>
+  <SolidColorBrush x:Key="Sifra.Status.InfoBrush" Color="{StaticResource Sifra.Status.Info}"/>
+</ResourceDictionary>

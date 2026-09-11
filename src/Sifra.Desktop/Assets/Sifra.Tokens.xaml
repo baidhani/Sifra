@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Corner-radius and spacing tokens carried forward from the identity
+    package's Sifra.DesignTokens.xaml. Its color/brush definitions were NOT
+    carried forward — they hardcoded dark-theme values under the same keys
+    (Sifra.SurfaceBrush, Sifra.TextPrimaryBrush, etc.) that Sifra.Theme.Light/
+    Dark.xaml now define correctly as theme-aware. Merging both would create
+    a key collision that silently breaks theme switching, so colors come
+    from Sifra.Brand.xaml + Sifra.Theme.*.xaml only.
+  -->
+  <CornerRadius x:Key="Sifra.Corner.Small">6</CornerRadius>
+  <CornerRadius x:Key="Sifra.Corner.Medium">10</CornerRadius>
+  <CornerRadius x:Key="Sifra.Corner.Large">16</CornerRadius>
+  <Thickness x:Key="Sifra.Space.1">4</Thickness>
+  <Thickness x:Key="Sifra.Space.2">8</Thickness>
+  <Thickness x:Key="Sifra.Space.3">12</Thickness>
+  <Thickness x:Key="Sifra.Space.4">16</Thickness>
+  <Thickness x:Key="Sifra.Space.6">24</Thickness>
+</ResourceDictionary>

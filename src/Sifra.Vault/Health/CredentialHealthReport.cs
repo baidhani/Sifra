@@ -11,6 +11,9 @@ public sealed class CredentialHealthReport
     public required bool IsWeak { get; init; }
     public required IReadOnlyList<PasswordWeaknessReason> Reasons { get; init; }
 
+    /// <summary>True when this exact password is also used by at least one other credential in the vault.</summary>
+    public required bool IsReused { get; init; }
+
     /// <summary>Null when breach checking wasn't run for this analysis.</summary>
     public BreachCheckOutcome? BreachOutcome { get; init; }
     public int? BreachCount { get; init; }

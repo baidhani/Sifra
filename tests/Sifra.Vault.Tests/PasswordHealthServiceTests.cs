@@ -84,6 +84,33 @@ public sealed class PasswordHealthServiceTests : IDisposable
     }
 
     [Fact]
+    public void AnalyzeAll_WithTwoCredentialsSharingTheSamePassword_FlagsBothAsReused()
+    {
+        var credentials = CreateCredentialService();
+        var id1 = credentials.Add(VaultCredential, "Site A", "userA", "Tr0ub4dor&3-Zebra!", null);
+        var id2 = credentials.Add(VaultCredential, "Site B", "userB", "Tr0ub4dor&3-Zebra!", null);
+        var service = new PasswordHealthService(credentials);
+
+        var reports = service.AnalyzeAll(VaultCredential);
+
+        Assert.True(reports.Single(r => r.CredentialId == id1).IsReused);
+        Assert.True(reports.Single(r => r.CredentialId == id2).IsReused);
+    }
+
+    [Fact]
+    public void AnalyzeAll_WithAllUniquePasswords_FlagsNoneAsReused()
+    {
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "Site A", "userA", "Tr0ub4dor&3-Zebra!", null);
+        credentials.Add(VaultCredential, "Site B", "userB", "Different-Passw0rd!9", null);
+        var service = new PasswordHealthService(credentials);
+
+        var reports = service.AnalyzeAll(VaultCredential);
+
+        Assert.All(reports, r => Assert.False(r.IsReused));
+    }
+
+    [Fact]
     public void AnalyzeAll_WithAnEmptyVault_ReturnsAnEmptyReportRatherThanFailing()
     {
         // Failure path: "analysis fails to identify weak passwords" — an
@@ -124,6 +151,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
         Assert.Contains("AnalyzeAll", lines[0]);
         Assert.Contains("analyzed=2", lines[0]);
         Assert.Contains("weak=1", lines[0]);
+        Assert.Contains("reused=0", lines[0]);
         Assert.DoesNotContain("password123", lines[0]);
         Assert.DoesNotContain("Tr0ub4dor&3-Zebra!", lines[0]);
     }
@@ -177,6 +205,22 @@ public sealed class PasswordHealthServiceTests : IDisposable
         var lines = sink.ReadAll();
         Assert.Single(lines);
         Assert.Contains("breached=1", lines[0]);
+        Assert.Contains("reused=0", lines[0]);
         Assert.DoesNotContain("leaked-password", lines[0]);
+    }
+
+    [Fact]
+    public async Task AnalyzeAllAsync_WithTwoCredentialsSharingTheSamePassword_FlagsBothAsReused()
+    {
+        var credentials = CreateCredentialService();
+        var id1 = credentials.Add(VaultCredential, "Site A", "userA", "shared-password-1", null);
+        var id2 = credentials.Add(VaultCredential, "Site B", "userB", "shared-password-1", null);
+        var breachChecker = new FakeBreachChecker();
+        var service = new PasswordHealthService(credentials);
+
+        var reports = await service.AnalyzeAllAsync(VaultCredential, breachChecker, CancellationToken.None);
+
+        Assert.True(reports.Single(r => r.CredentialId == id1).IsReused);
+        Assert.True(reports.Single(r => r.CredentialId == id2).IsReused);
     }
 }

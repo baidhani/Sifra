@@ -1,0 +1,33 @@
+<UserControl x:Class="Sifra.Desktop.SetupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid>
+        <ui:Card x:Name="IntroPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Padding="32">
+            <StackPanel>
+                <Image Source="Assets/Brand/sifra_icon_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                <ui:TextBlock Text="Create your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <ui:TextBlock Text="This is the first time Sifra has run on this device. Choose a master password to protect your vault." TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
+
+                <ui:TextBlock Text="Master password" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+                <ui:PasswordBox x:Name="MasterPasswordBox" PasswordChar="&#9679;" PlaceholderText="Enter a master password" Margin="0,0,0,20"/>
+
+                <ui:Button x:Name="CreateVaultButton" Content="Create Vault" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnCreateVaultClick"/>
+                <ui:TextBlock x:Name="ErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ui:Card>
+
+        <ui:Card x:Name="RecoveryPanel" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Width="440" Padding="32">
+            <StackPanel>
+                <ui:TextBlock Text="Vault created" FontTypography="Subtitle" Foreground="{DynamicResource SystemFillColorSuccessBrush}" Margin="0,0,0,8"/>
+                <ui:TextBlock Text="Your recovery key (shown once — save it somewhere safe now):" TextWrapping="Wrap" FontTypography="Body" Margin="0,0,0,10"/>
+                <ui:TextBox x:Name="RecoveryKeyText" IsReadOnly="True" FontFamily="Consolas" FontSize="16" Margin="0,0,0,24"/>
+                <ui:Button Content="Continue to Unlock" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnContinueClick"/>
+            </StackPanel>
+        </ui:Card>
+    </Grid>
+</UserControl>

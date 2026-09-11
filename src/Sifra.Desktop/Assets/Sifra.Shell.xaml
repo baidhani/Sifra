@@ -1,0 +1,51 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Sidebar navigation item. Icons live in Sifra.Icons.xaml as raw Geometry
+    (no baked-in color) so they can pick up this RadioButton's Foreground —
+    each nav item's icon Path binds Stroke to its ancestor RadioButton.
+    Selected/hover backgrounds and the selected text color are theme-aware
+    (Sifra.Theme.*.xaml); RadioButton.GroupName gives mutual exclusion for
+    free, matching "one section active at a time" in the reference mockup.
+  -->
+  <Style x:Key="Sifra.NavItem" TargetType="RadioButton">
+    <Setter Property="GroupName" Value="MainNav"/>
+    <Setter Property="Foreground" Value="{DynamicResource Sifra.TextSecondaryBrush}"/>
+    <Setter Property="Padding" Value="12,10"/>
+    <Setter Property="Margin" Value="8,2,8,0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Border x:Name="Root" Background="Transparent" CornerRadius="{DynamicResource Sifra.Corner.Small}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Sifra.SelectedBrush}"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Root" Property="Background" Value="{DynamicResource Sifra.HoverBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsChecked" Value="True">
+        <Setter Property="Foreground" Value="{DynamicResource Sifra.SelectedTextBrush}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- One of these per stat card on the Vault screen (Total/Weak/Reused/Compromised). -->
+  <Style x:Key="Sifra.StatCard" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource Sifra.CardBrush}"/>
+    <Setter Property="CornerRadius" Value="{DynamicResource Sifra.Corner.Medium}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Sifra.BorderBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Padding" Value="16,14"/>
+  </Style>
+</ResourceDictionary>

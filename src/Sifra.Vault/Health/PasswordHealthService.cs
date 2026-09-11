@@ -36,24 +36,26 @@ public sealed class PasswordHealthService
 
     public IReadOnlyList<CredentialHealthReport> AnalyzeAll(string vaultCredential)
     {
-        var summaries = _credentials.List(vaultCredential);
+        var decrypted = DecryptAll(vaultCredential);
+        var reusedIds = FindReusedCredentialIds(decrypted);
         var reports = new List<CredentialHealthReport>();
 
-        foreach (var summary in summaries)
+        foreach (var (id, label, password) in decrypted)
         {
-            var full = _credentials.GetById(vaultCredential, summary.Id);
-            var reasons = AnalyzePassword(full.Password!);
+            var reasons = AnalyzePassword(password);
             reports.Add(new CredentialHealthReport
             {
-                CredentialId = full.Id,
-                Label = full.Label,
+                CredentialId = id,
+                Label = label,
                 IsWeak = reasons.Count > 0,
                 Reasons = reasons,
+                IsReused = reusedIds.Contains(id),
             });
         }
 
         var weakCount = reports.Count(r => r.IsWeak);
-        _auditLogger?.Log(nameof(AnalyzeAll), Environment.UserName, details: $"analyzed={reports.Count} weak={weakCount}");
+        var reusedCount = reports.Count(r => r.IsReused);
+        _auditLogger?.Log(nameof(AnalyzeAll), Environment.UserName, details: $"analyzed={reports.Count} weak={weakCount} reused={reusedCount}");
 
         return reports;
     }
@@ -67,34 +69,50 @@ public sealed class PasswordHealthService
     public async Task<IReadOnlyList<CredentialHealthReport>> AnalyzeAllAsync(
         string vaultCredential, IBreachChecker breachChecker, CancellationToken cancellationToken)
     {
-        var summaries = _credentials.List(vaultCredential);
+        var decrypted = DecryptAll(vaultCredential);
+        var reusedIds = FindReusedCredentialIds(decrypted);
         var reports = new List<CredentialHealthReport>();
 
-        foreach (var summary in summaries)
+        foreach (var (id, label, password) in decrypted)
         {
-            var full = _credentials.GetById(vaultCredential, summary.Id);
-            var reasons = AnalyzePassword(full.Password!);
-            var breach = await breachChecker.CheckAsync(full.Password!, cancellationToken);
+            var reasons = AnalyzePassword(password);
+            var breach = await breachChecker.CheckAsync(password, cancellationToken);
 
             reports.Add(new CredentialHealthReport
             {
-                CredentialId = full.Id,
-                Label = full.Label,
+                CredentialId = id,
+                Label = label,
                 IsWeak = reasons.Count > 0,
                 Reasons = reasons,
+                IsReused = reusedIds.Contains(id),
                 BreachOutcome = breach.Outcome,
                 BreachCount = breach.BreachCount,
             });
         }
 
         var weakCount = reports.Count(r => r.IsWeak);
+        var reusedCount = reports.Count(r => r.IsReused);
         var breachedCount = reports.Count(r => r.BreachOutcome == BreachCheckOutcome.Breached);
         var unavailableCount = reports.Count(r => r.BreachOutcome == BreachCheckOutcome.CheckUnavailable);
         _auditLogger?.Log(nameof(AnalyzeAllAsync), Environment.UserName,
-            details: $"analyzed={reports.Count} weak={weakCount} breached={breachedCount} breachCheckUnavailable={unavailableCount}");
+            details: $"analyzed={reports.Count} weak={weakCount} reused={reusedCount} breached={breachedCount} breachCheckUnavailable={unavailableCount}");
 
         return reports;
     }
+
+    private List<(string Id, string Label, string Password)> DecryptAll(string vaultCredential) =>
+        _credentials.List(vaultCredential)
+            .Select(summary => _credentials.GetById(vaultCredential, summary.Id))
+            .Select(full => (full.Id, full.Label, full.Password!))
+            .ToList();
+
+    /// <summary>Any password shared by 2+ credentials flags every credential sharing it — never just one of the pair.</summary>
+    private static HashSet<string> FindReusedCredentialIds(List<(string Id, string Label, string Password)> decrypted) =>
+        decrypted
+            .GroupBy(d => d.Password, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .SelectMany(g => g.Select(d => d.Id))
+            .ToHashSet();
 
     private static IReadOnlyList<PasswordWeaknessReason> AnalyzePassword(string password)
     {

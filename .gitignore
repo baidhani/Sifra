@@ -2,5 +2,8 @@
 bin/
 obj/
 
+# Visual Studio local cache
+.vs/
+
 # Local secrets — never committed
 .secrets/
