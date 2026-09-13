@@ -183,6 +183,28 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
     }
 
     [Fact]
+    public void SetTags_ReplacesTagsWithoutTouchingFieldsOrOtherMetadata()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "Bank", new[] { ("Phone", "555-0100", CustomFieldType.Phone) }, isFavorite: true, tags: new[] { "old" });
+
+        service.SetTags(id, new[] { "work", "important" });
+
+        var view = service.GetById(VaultCredential, id);
+        Assert.Equal(new[] { "work", "important" }, view.Tags);
+        Assert.Equal("555-0100", view.Fields.Single().Value);
+        Assert.True(view.IsFavorite);
+    }
+
+    [Fact]
+    public void SetTags_ForANonExistentCredential_ThrowsCredentialNotFound()
+    {
+        var service = CreateService();
+
+        Assert.Throws<CredentialNotFoundException>(() => service.SetTags("does-not-exist", new[] { "work" }));
+    }
+
+    [Fact]
     public void Search_MatchesByFieldValueOrLabel()
     {
         var service = CreateService();

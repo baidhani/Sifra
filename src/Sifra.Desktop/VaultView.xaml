@@ -43,7 +43,7 @@
                            Content="Lock" Icon="{ui:SymbolIcon LockClosed24}" Margin="0,0,8,0" Click="OnLockClick"/>
                 <ui:Button Content="Sync" Icon="{ui:SymbolIcon ArrowSync24}" Margin="0,0,8,0" Click="OnPlaceholderToolClick" Tag="Sync"/>
                 <ui:Button Content="Generator" Icon="{ui:SymbolIcon Key24}" Margin="0,0,8,0" Click="OnPlaceholderToolClick" Tag="Generator"/>
-                <ui:Button Content="Options" Icon="{ui:SymbolIcon Settings24}" Click="OnPlaceholderToolClick" Tag="Settings"/>
+                <ui:Button Content="Options" Icon="{ui:SymbolIcon Settings24}" Click="OnOptionsClick"/>
             </StackPanel>
 
             <ui:TextBox x:Name="SearchBox" Grid.Column="1" Width="220" MinWidth="140" Margin="20,0,0,0"

@@ -13,6 +13,7 @@ public partial class VaultView : UserControl
     private string _category = "All"; // "All" | "Favorites" | "Weak" | "Reused" | "Compromised" | a label name
 
     public event EventHandler? LockRequested;
+    public event EventHandler? SettingsChanged;
 
     public VaultView(AppServices services, string vaultCredential)
     {
@@ -332,6 +333,13 @@ public partial class VaultView : UserControl
     private void OnLockClick(object sender, RoutedEventArgs e)
     {
         LockRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnOptionsClick(object sender, RoutedEventArgs e)
+    {
+        var window = new OptionsWindow(_services) { Owner = Window.GetWindow(this) };
+        window.SettingsChanged += (_, _) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+        window.ShowDialog();
     }
 
     private void OnPlaceholderToolClick(object sender, RoutedEventArgs e)

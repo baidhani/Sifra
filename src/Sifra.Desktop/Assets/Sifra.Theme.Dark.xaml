@@ -12,6 +12,13 @@
   <Color x:Key="Sifra.Theme.Selected">#0A6CFF</Color>
   <Color x:Key="Sifra.Theme.SelectedText">#FFFFFF</Color>
   <Color x:Key="Sifra.Theme.Input">#0A1A31</Color>
+  <!-- Lighter than Theme.Selected (#0A6CFF) — that accent blue reads fine as a
+       fill/highlight but is too dark for text on this navy background. -->
+  <Color x:Key="Sifra.Theme.Link">#6FB2FF</Color>
+  <!-- A more saturated cyan-blue than Theme.Link, not just a lighter/whiter
+       tint of it — reads as a clear color shift on hover instead of washing
+       out toward white, while staying distinct from the navy background. -->
+  <Color x:Key="Sifra.Theme.LinkHover">#29C4FF</Color>
 
   <SolidColorBrush x:Key="Sifra.WindowBrush" Color="{StaticResource Sifra.Theme.Window}"/>
   <SolidColorBrush x:Key="Sifra.SidebarBrush" Color="{StaticResource Sifra.Theme.Sidebar}"/>
@@ -25,4 +32,6 @@
   <SolidColorBrush x:Key="Sifra.SelectedBrush" Color="{StaticResource Sifra.Theme.Selected}"/>
   <SolidColorBrush x:Key="Sifra.SelectedTextBrush" Color="{StaticResource Sifra.Theme.SelectedText}"/>
   <SolidColorBrush x:Key="Sifra.InputBrush" Color="{StaticResource Sifra.Theme.Input}"/>
+  <SolidColorBrush x:Key="Sifra.LinkBrush" Color="{StaticResource Sifra.Theme.Link}"/>
+  <SolidColorBrush x:Key="Sifra.LinkHoverBrush" Color="{StaticResource Sifra.Theme.LinkHover}"/>
 </ResourceDictionary>

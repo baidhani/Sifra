@@ -131,6 +131,15 @@ public sealed class CredentialService
         _auditLogger?.Log(nameof(SetIcon), Environment.UserName, details: $"id={id} kind={icon?.Kind}");
     }
 
+    /// <summary>Replaces the credential's tags without touching any other field — for the detail pane's quick "Set tags" action.</summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void SetTags(string id, IReadOnlyList<string> tags)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { Tags = tags, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(SetTags), Environment.UserName, details: $"id={id} tagCount={tags.Count}");
+    }
+
     /// <summary>Toggles IsFavorite without needing every other field — a common, low-risk single-flag update.</summary>
     /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
     public void SetFavorite(string id, bool isFavorite)

@@ -7,6 +7,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Sifra.Vault.Attachments;
 using Sifra.Vault.Credentials;
+using Sifra.Vault.Health;
 
 namespace Sifra.Desktop;
 
@@ -407,8 +408,21 @@ public partial class CredentialDetailView : UserControl
 
         if (field.Type == CustomFieldType.Website && Uri.TryCreate(field.Value, UriKind.Absolute, out _))
         {
-            var link = new Wpf.Ui.Controls.HyperlinkButton { Content = field.Value, VerticalAlignment = VerticalAlignment.Center };
-            link.Click += (_, _) => OpenUrl(field.Value);
+            // A plain TextBlock rather than Wpf.Ui's HyperlinkButton: that control's
+            // built-in hover style pulled from the WPF-UI theme accent, which barely
+            // differed from this app's navy background and was hard to see on hover.
+            // Owning both states directly guarantees a visible color change.
+            var link = new TextBlock
+            {
+                Text = field.Value,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextDecorations = TextDecorations.Underline,
+                Cursor = System.Windows.Input.Cursors.Hand,
+            };
+            link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkBrush");
+            link.MouseEnter += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkHoverBrush");
+            link.MouseLeave += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkBrush");
+            link.MouseLeftButtonUp += (_, _) => OpenUrl(field.Value);
             Grid.SetColumn(link, 0);
             row.Children.Add(link);
             AddButtonColumn(row, "Copy24", "Copy website", () => CopyToClipboard(field.Value));
@@ -442,9 +456,62 @@ public partial class CredentialDetailView : UserControl
         if (field.Type == CustomFieldType.Password)
         {
             AddButtonColumn(row, "History24", "View password history", () => ShowPasswordHistory(field.Name));
+
+            if (!string.IsNullOrEmpty(field.Value))
+            {
+                panel.Children.Add(BuildStrengthMeter(field.Value));
+            }
         }
 
         return panel;
+    }
+
+    // A local, offline crack-time estimate (see PasswordStrengthEstimator) —
+    // never sent anywhere, computed from the plaintext already decrypted
+    // for display. Purely a strength hint, not a security verdict.
+    private static FrameworkElement BuildStrengthMeter(string password)
+    {
+        var estimate = PasswordStrengthEstimator.Estimate(password);
+        var levelBrush = PasswordStrengthUi.ColorFor(estimate.Level);
+
+        // Fixed, compact width rather than stretching across the whole
+        // field — this is a small strength hint, not a progress bar for
+        // the row itself.
+        var container = new StackPanel { Margin = new Thickness(0, 10, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, Width = 160 };
+
+        var segments = new Grid();
+        for (var i = 0; i < 4; i++)
+        {
+            segments.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var segment = new Border
+            {
+                Height = 4,
+                CornerRadius = new CornerRadius(2),
+                Margin = new Thickness(i == 0 ? 0 : 3, 0, 0, 0),
+            };
+            segment.SetResourceReference(Border.BackgroundProperty, "Sifra.BorderBrush");
+            if (i < estimate.FilledSegments)
+            {
+                segment.Background = levelBrush;
+            }
+
+            Grid.SetColumn(segment, i);
+            segments.Children.Add(segment);
+        }
+
+        container.Children.Add(segments);
+
+        var crackTimeText = new Wpf.Ui.Controls.TextBlock
+        {
+            Text = $"Crack time: {estimate.CrackTimeDisplay}",
+            FontTypography = Wpf.Ui.Controls.FontTypography.Caption,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 6, 0, 0),
+        };
+        crackTimeText.SetResourceReference(Control.ForegroundProperty, "Sifra.TextSecondaryBrush");
+        container.Children.Add(crackTimeText);
+
+        return container;
     }
 
     private void ShowPasswordHistory(string fieldName)
@@ -545,6 +612,23 @@ public partial class CredentialDetailView : UserControl
 
         if (window.ShowDialog() == true)
         {
+            ShowCredential(_current.Id);
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void OnSetTagsClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null) return;
+
+        var window = new SetTagsWindow(_services.Tags, _current.Tags ?? Array.Empty<string>())
+        {
+            Owner = Window.GetWindow(this),
+        };
+
+        if (window.ShowDialog() == true)
+        {
+            _services.Credentials.SetTags(_current.Id, window.SelectedTags);
             ShowCredential(_current.Id);
             Changed?.Invoke(this, EventArgs.Empty);
         }

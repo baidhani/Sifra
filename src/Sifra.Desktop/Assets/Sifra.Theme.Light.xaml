@@ -13,6 +13,8 @@
   <Color x:Key="Sifra.Theme.Selected">#E3EEFF</Color>
   <Color x:Key="Sifra.Theme.SelectedText">#0A6CFF</Color>
   <Color x:Key="Sifra.Theme.Input">#FFFFFF</Color>
+  <Color x:Key="Sifra.Theme.Link">#0A6CFF</Color>
+  <Color x:Key="Sifra.Theme.LinkHover">#084FC2</Color>
 
   <SolidColorBrush x:Key="Sifra.WindowBrush" Color="{StaticResource Sifra.Theme.Window}"/>
   <SolidColorBrush x:Key="Sifra.SidebarBrush" Color="{StaticResource Sifra.Theme.Sidebar}"/>
@@ -26,4 +28,6 @@
   <SolidColorBrush x:Key="Sifra.SelectedBrush" Color="{StaticResource Sifra.Theme.Selected}"/>
   <SolidColorBrush x:Key="Sifra.SelectedTextBrush" Color="{StaticResource Sifra.Theme.SelectedText}"/>
   <SolidColorBrush x:Key="Sifra.InputBrush" Color="{StaticResource Sifra.Theme.Input}"/>
+  <SolidColorBrush x:Key="Sifra.LinkBrush" Color="{StaticResource Sifra.Theme.Link}"/>
+  <SolidColorBrush x:Key="Sifra.LinkHoverBrush" Color="{StaticResource Sifra.Theme.LinkHover}"/>
 </ResourceDictionary>

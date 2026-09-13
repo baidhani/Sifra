@@ -14,6 +14,7 @@ public partial class MainWindow : FluentWindow
     private const int ResizeEdgeThresholdPx = 8;
 
     private readonly AppServices _services = new();
+    private readonly IdleLockMonitor _idleLockMonitor = new();
     private bool _resizeLocked;
     private IntPtr _originalWndProc;
     // Kept as a field, not a local — native code holds a raw pointer to this
@@ -25,6 +26,15 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         SetCompactWindowSize();
         ShowInitialScreen();
+
+        // Any user input anywhere in the window counts as activity — Preview
+        // events tunnel from the root down, so this sees mouse/keyboard
+        // activity from every child control without each of them wiring it
+        // individually.
+        PreviewMouseMove += (_, _) => _idleLockMonitor.NotifyActivity();
+        PreviewMouseDown += (_, _) => _idleLockMonitor.NotifyActivity();
+        PreviewKeyDown += (_, _) => _idleLockMonitor.NotifyActivity();
+        _idleLockMonitor.TimedOut += (_, _) => ShowUnlock();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -105,6 +115,11 @@ public partial class MainWindow : FluentWindow
 
     private void ShowUnlock()
     {
+        // Stops the idle timer for both paths that reach here: an explicit
+        // Lock click and an idle timeout that already fired once — either
+        // way, no vault is unlocked any more, so nothing should keep ticking
+        // toward a second auto-lock.
+        _idleLockMonitor.Stop();
         SetCompactWindowSize();
         RootGrid.Children.Clear();
         var unlockView = new UnlockView(_services);
@@ -114,9 +129,17 @@ public partial class MainWindow : FluentWindow
             SetShellWindowSize();
             var shellView = new ShellView(_services, vaultCredential);
             shellView.LockRequested += (_, _) => ShowUnlock();
+            shellView.SettingsChanged += (_, _) => StartIdleLockMonitor();
             RootGrid.Children.Add(shellView);
+            StartIdleLockMonitor();
         };
         RootGrid.Children.Add(unlockView);
+    }
+
+    private void StartIdleLockMonitor()
+    {
+        var minutes = _services.Settings.Get().AutoLockMinutes;
+        _idleLockMonitor.Start(minutes is > 0 ? TimeSpan.FromMinutes(minutes.Value) : null);
     }
 
     // Setup/Unlock's card fills the window edge-to-edge (Stretch alignment).

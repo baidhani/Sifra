@@ -8,6 +8,7 @@ using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Health;
 using Sifra.Vault.Session;
+using Sifra.Vault.Settings;
 using Sifra.Vault.Tags;
 
 namespace Sifra.Desktop;
@@ -30,6 +31,7 @@ public sealed class AppServices
     public TagService Tags { get; }
     public PasswordHealthService PasswordHealth { get; }
     public IBreachChecker BreachChecker { get; } = new HibpBreachChecker(new HttpClient());
+    public AppSettingsStore Settings { get; } = new(null);
 
     public AppServices()
     {
