@@ -100,10 +100,18 @@ public sealed class PasswordHealthService
         return reports;
     }
 
+    /// <summary>
+    /// Only credentials with at least one non-empty Password-type field are
+    /// analyzed. An empty password field isn't a weak/reused/breached
+    /// password — it's just an unfilled field — so counting it would flag
+    /// every blank-password credential as "weak" and lump them all
+    /// together as "reused", purely as noise.
+    /// </summary>
     private List<(string Id, string Label, string Password)> DecryptAll(string vaultCredential) =>
         _credentials.List(vaultCredential)
-            .Select(summary => _credentials.GetById(vaultCredential, summary.Id))
-            .Select(full => (full.Id, full.Label, full.Password!))
+            .Select(v => (v.Id, v.Label, Password: v.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Password)?.Value))
+            .Where(t => !string.IsNullOrEmpty(t.Password))
+            .Select(t => (t.Id, t.Label, t.Password!))
             .ToList();
 
     /// <summary>Any password shared by 2+ credentials flags every credential sharing it — never just one of the pair.</summary>

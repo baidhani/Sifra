@@ -128,9 +128,17 @@ public partial class MainWindow : FluentWindow
     // first layout pass, so the card always matches the window exactly.
     private void SetCompactWindowSize()
     {
-        MinWidth = 420;
+        // 480, not 420: the Setup recovery-key panel needs ~396px of inner
+        // content width to fit its 39-character key on one line without
+        // wrapping (39 monospace chars + textbox padding), plus 64px of card
+        // padding (32 each side) — and a further ~20px of slack beyond that
+        // exact sum, or rounded-corner/glyph anti-aliasing bleeds past the
+        // content's own boundary and gets clipped (confirmed: happened at
+        // exactly-396-fits-396 with zero slack; the narrower intro panel,
+        // with 40px of slack per side, never showed it).
+        MinWidth = 480;
         MinHeight = 560;
-        Width = 420;
+        Width = 480;
         Height = 560;
         SizeToContent = SizeToContent.Manual;
         // Setup/Unlock's card fills the window edge-to-edge, so blend the title

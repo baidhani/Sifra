@@ -17,10 +17,14 @@
     Sifra.Theme.Light/Dark.xaml entry is) — this dictionary is permanent;
     it just keeps pointing at whichever theme colors are currently loaded.
 
-    Accent-appearance buttons (ui:Button Appearance="Primary") are
-    deliberately NOT touched here: they use AccentButtonBackground/
-    Foreground, which is already Sifra's brand blue in both themes per the
-    package's own rule that brand colors don't change with theme.
+    Accent-appearance buttons (ui:Button Appearance="Primary") leave
+    AccentButtonBackground alone — already Sifra's brand blue in both themes
+    per the package's own rule that brand colors don't change with theme.
+    AccentButtonForeground is a different story: WPF-UI's default is a dark
+    color meant for a light accent fill, which reads as low-contrast dark
+    text on our bright blue buttons — the design package has no button with
+    dark text on it. Overriding the foreground (not the background) fixes
+    that without touching the brand color itself.
   -->
 
   <!-- ui:Card -->
@@ -57,6 +61,11 @@
     <Setter Property="SelectionBrush" Value="{DynamicResource Sifra.Brand.PrimaryBrush}"/>
     <Setter Property="SelectionTextBrush" Value="{DynamicResource Sifra.SelectedTextBrush}"/>
   </Style>
+
+  <!-- ui:Button, Accent (Appearance="Primary") foreground only — see note above -->
+  <SolidColorBrush x:Key="AccentButtonForeground" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
+  <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
+  <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
 
   <!-- ui:Button, default (non-Accent) appearance -->
   <SolidColorBrush x:Key="ButtonBackground" Color="{DynamicResource Sifra.Theme.Card}"/>

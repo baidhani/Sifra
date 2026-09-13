@@ -3,7 +3,11 @@ using Sifra.Vault.Crypto;
 
 namespace Sifra.Vault.Tests;
 
-/// <summary>Covers the extended fields added on top of STORY-002's original Label/Username/Password/Url model.</summary>
+/// <summary>
+/// Covers the fully dynamic field model: a credential is a Label plus any
+/// number of typed fields (no fixed Username/Password/Url/Phone/Notes/
+/// AccountNumber/Pin shape any more), plus Favorite/Tags metadata.
+/// </summary>
 public sealed class CredentialExtendedFieldsTests : IDisposable
 {
     private const string VaultCredential = "correct-horse-battery-staple";
@@ -29,103 +33,112 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
         new FakeCredentialClipboard());
 
     [Fact]
-    public void Add_WithExtendedFields_ThenGetById_RoundTripsAllOfThem()
+    public void Add_WithManyFieldTypes_ThenGetById_RoundTripsAllOfThem()
     {
         var service = CreateService();
 
         var id = service.Add(
-            VaultCredential, "Bank", "firas", "hunter2", "https://bank.example.com",
-            phone: "555-0100", notes: "call before 5pm", accountNumber: "ACC-12345", pin: "4321",
-            customFields: new[] { ("Security Question", "Mother's maiden name", CustomFieldType.Text) },
-            isFavorite: true, labels: new[] { "Finance", "Important" });
+            VaultCredential, "Bank",
+            new (string, string, CustomFieldType)[]
+            {
+                ("Login", "firas", CustomFieldType.Login),
+                ("Password", "hunter2", CustomFieldType.Password),
+                ("Website", "https://bank.example.com", CustomFieldType.Website),
+                ("Phone", "555-0100", CustomFieldType.Phone),
+                ("Notes", "call before 5pm", CustomFieldType.Text),
+                ("Account number", "ACC-12345", CustomFieldType.Text),
+                ("PIN", "4321", CustomFieldType.Pin),
+                ("Security Question", "Mother's maiden name", CustomFieldType.Text),
+            },
+            isFavorite: true, tags: new[] { "Finance", "Important" });
 
         var view = service.GetById(VaultCredential, id);
 
-        Assert.Equal("555-0100", view.Phone);
-        Assert.Equal("call before 5pm", view.Notes);
-        Assert.Equal("ACC-12345", view.AccountNumber);
-        Assert.Equal("4321", view.Pin);
-        Assert.Equal(new[] { "Finance", "Important" }, view.Labels);
+        Assert.Equal(new[] { "Finance", "Important" }, view.Tags);
         Assert.True(view.IsFavorite);
-        Assert.Single(view.CustomFields!);
-        Assert.Equal("Security Question", view.CustomFields![0].Name);
-        Assert.Equal("Mother's maiden name", view.CustomFields[0].Value);
-        Assert.Equal(CustomFieldType.Text, view.CustomFields[0].Type);
+        Assert.Equal(8, view.Fields.Count);
+        Assert.Equal("firas", view.Fields.Single(f => f.Name == "Login").Value);
+        Assert.Equal("hunter2", view.Fields.Single(f => f.Name == "Password").Value);
+        Assert.Equal(CustomFieldType.Phone, view.Fields.Single(f => f.Name == "Phone").Type);
+        Assert.Equal("4321", view.Fields.Single(f => f.Name == "PIN").Value);
+        Assert.Equal(CustomFieldType.Pin, view.Fields.Single(f => f.Name == "PIN").Type);
+        var securityQuestion = view.Fields.Single(f => f.Name == "Security Question");
+        Assert.Equal("Mother's maiden name", securityQuestion.Value);
+        Assert.Equal(CustomFieldType.Text, securityQuestion.Type);
     }
 
     [Fact]
-    public void CustomField_PreservesItsTypeAcrossEncryptAndDecrypt()
+    public void Field_PreservesItsTypeAcrossEncryptAndDecrypt()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "Site", "user", "pass", null,
-            customFields: new[] { ("2FA Secret", "JBSWY3DPEHPK3PXP", CustomFieldType.OneTimePassword) });
+        var id = service.Add(VaultCredential, "Site",
+            new[] { ("2FA Secret", "JBSWY3DPEHPK3PXP", CustomFieldType.OneTimePassword) });
 
         var view = service.GetById(VaultCredential, id);
 
-        Assert.Equal(CustomFieldType.OneTimePassword, view.CustomFields!.Single().Type);
+        Assert.Equal(CustomFieldType.OneTimePassword, view.Fields.Single().Type);
     }
 
     [Fact]
-    public void Add_WithoutExtendedFields_LeavesThemNullOrEmptyRatherThanFailing()
+    public void Add_WithNoFields_LeavesFieldsEmptyRatherThanFailing()
     {
-        // Failure path guard: omitting the new optional fields must behave
-        // exactly like the original STORY-002 API, not throw or corrupt data.
+        // Failure path guard: a credential can legitimately have zero fields
+        // (e.g. a bare note under just a label) — must not throw or corrupt data.
         var service = CreateService();
 
-        var id = service.Add(VaultCredential, "Simple Site", "user", "pass", null);
+        var id = service.Add(VaultCredential, "Simple Site", Array.Empty<(string, string, CustomFieldType)>());
         var view = service.GetById(VaultCredential, id);
 
-        Assert.Null(view.Phone);
-        Assert.Null(view.Notes);
-        Assert.Null(view.AccountNumber);
-        Assert.Null(view.Pin);
-        Assert.Empty(view.CustomFields!);
+        Assert.Empty(view.Fields);
         Assert.False(view.IsFavorite);
-        Assert.Empty(view.Labels!);
+        Assert.Empty(view.Tags!);
     }
 
     [Fact]
-    public void List_NeverIncludesNotesAccountNumberPinOrCustomFieldValues()
+    public void List_IncludesEveryFieldFullyDecrypted()
     {
-        // Trust: the same "no secrets in the list view" rule that already
-        // applies to Password must extend to every new secret field.
+        // With a fully dynamic field model there is no fixed "safe" field
+        // left to expose without decrypting (see CredentialView's own
+        // remarks) — List and GetById return the same decrypted data.
         var service = CreateService();
         service.Add(
-            VaultCredential, "Bank", "firas", "hunter2", null,
-            notes: "super secret note", accountNumber: "ACC-99999", pin: "0000",
-            customFields: new[] { ("Recovery Code", "leaked-recovery-code", CustomFieldType.Secret) });
+            VaultCredential, "Bank",
+            new[] { ("Recovery Code", "leaked-recovery-code", CustomFieldType.Secret) });
 
         var listed = service.List(VaultCredential).Single();
 
-        Assert.Null(listed.Password);
-        Assert.Null(listed.Notes);
-        Assert.Null(listed.AccountNumber);
-        Assert.Null(listed.Pin);
-        Assert.True(listed.CustomFields is null || listed.CustomFields.Count == 0);
+        Assert.Single(listed.Fields);
+        Assert.Equal("leaked-recovery-code", listed.Fields[0].Value);
     }
 
     [Fact]
-    public void List_IncludesPhoneFavoriteAndLabels_SinceTheyAreNotSecrets()
+    public void List_IncludesFavoriteAndTags()
     {
         var service = CreateService();
-        service.Add(VaultCredential, "Bank", "firas", "hunter2", null,
-            phone: "555-0100", isFavorite: true, labels: new[] { "Finance" });
+        service.Add(VaultCredential, "Bank",
+            new[] { ("Phone", "555-0100", CustomFieldType.Phone) },
+            isFavorite: true, tags: new[] { "Finance" });
 
         var listed = service.List(VaultCredential).Single();
 
-        Assert.Equal("555-0100", listed.Phone);
+        Assert.Equal("555-0100", listed.Fields.Single().Value);
         Assert.True(listed.IsFavorite);
-        Assert.Equal(new[] { "Finance" }, listed.Labels);
+        Assert.Equal(new[] { "Finance" }, listed.Tags);
     }
 
     [Fact]
-    public void RawStorage_NeverContainsExtendedSecretFieldsAsPlaintext()
+    public void RawStorage_NeverContainsFieldValuesAsPlaintext()
     {
         var service = CreateService();
         service.Add(
-            VaultCredential, "Bank", "firas", "hunter2", null,
-            notes: "super-secret-note-value", accountNumber: "ACC-77777", pin: "9999",
-            customFields: new[] { ("Field", "custom-secret-value", CustomFieldType.Text) });
+            VaultCredential, "Bank",
+            new[]
+            {
+                ("Notes", "super-secret-note-value", CustomFieldType.Text),
+                ("Account number", "ACC-77777", CustomFieldType.Text),
+                ("PIN", "9999", CustomFieldType.Pin),
+                ("Field", "custom-secret-value", CustomFieldType.Text),
+            });
 
         var raw = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
 
@@ -136,15 +149,15 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
     }
 
     [Fact]
-    public void Edit_UpdatesExtendedFields()
+    public void Edit_ReplacesTheFieldList()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "Bank", "firas", "hunter2", null, phone: "555-0100");
+        var id = service.Add(VaultCredential, "Bank", new[] { ("Phone", "555-0100", CustomFieldType.Phone) });
 
-        service.Edit(VaultCredential, id, "Bank", "firas", "hunter2", null, phone: "555-9999", isFavorite: true);
+        service.Edit(VaultCredential, id, "Bank", new[] { ("Phone", "555-9999", CustomFieldType.Phone) }, isFavorite: true);
 
         var view = service.GetById(VaultCredential, id);
-        Assert.Equal("555-9999", view.Phone);
+        Assert.Equal("555-9999", view.Fields.Single().Value);
         Assert.True(view.IsFavorite);
     }
 
@@ -152,7 +165,7 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
     public void SetFavorite_TogglesWithoutRequiringEveryOtherField()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "Bank", "firas", "hunter2", null);
+        var id = service.Add(VaultCredential, "Bank", Array.Empty<(string, string, CustomFieldType)>());
 
         service.SetFavorite(id, true);
         Assert.True(service.GetById(VaultCredential, id).IsFavorite);
@@ -170,11 +183,12 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
     }
 
     [Fact]
-    public void Search_MatchesByPhoneOrLabel()
+    public void Search_MatchesByFieldValueOrLabel()
     {
         var service = CreateService();
-        service.Add(VaultCredential, "Bank", "firas", "hunter2", null, phone: "555-0100", labels: new[] { "Finance" });
-        service.Add(VaultCredential, "Other", "user2", "pw", null);
+        service.Add(VaultCredential, "Bank",
+            new[] { ("Phone", "555-0100", CustomFieldType.Phone) }, tags: new[] { "Finance" });
+        service.Add(VaultCredential, "Other", new[] { ("Login", "user2", CustomFieldType.Login) });
 
         Assert.Single(service.Search(VaultCredential, "555-0100"));
         Assert.Single(service.Search(VaultCredential, "Finance"));

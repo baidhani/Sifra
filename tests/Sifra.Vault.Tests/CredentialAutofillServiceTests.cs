@@ -2,6 +2,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Autofill;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -37,7 +38,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     {
         // Acceptance: visiting a login page offers matching credentials.
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com/settings");
+        credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com/settings"));
         var service = new CredentialAutofillService(credentials);
 
         var offered = service.OfferCredentialsForUrl(VaultCredential, "https://github.com/login");
@@ -50,7 +51,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     public void OfferCredentialsForUrl_WithNoMatchingCredential_OffersNothing()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = new CredentialAutofillService(credentials);
 
         var offered = service.OfferCredentialsForUrl(VaultCredential, "https://example.com/login");
@@ -63,13 +64,13 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     {
         // Acceptance (implicit happy path for fill): consenting fills it.
         var credentials = CreateCredentialService();
-        var id = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = new CredentialAutofillService(credentials);
 
         var filled = service.FillCredential(VaultCredential, id, "https://github.com/login", consentGranted: true);
 
-        Assert.Equal("firas", filled.Username);
-        Assert.Equal("hunter2", filled.Password);
+        Assert.Equal("firas", filled.Username());
+        Assert.Equal("hunter2", filled.Password());
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
         // Acceptance: denying autofill means credentials are not filled.
         // Failure path: "autofill occurs without user consent."
         var credentials = CreateCredentialService();
-        var id = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = new CredentialAutofillService(credentials);
 
         Assert.Throws<AutofillConsentRequiredException>(
@@ -91,7 +92,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
         // Failure path: "incorrect credentials filled" — a credential id
         // must actually belong to the page being filled, not just exist.
         var credentials = CreateCredentialService();
-        var githubId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var githubId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = new CredentialAutofillService(credentials);
 
         Assert.Throws<CredentialDomainMismatchException>(
@@ -115,7 +116,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
         // failure (here: wrong vault credential at fill time) must be
         // surfaced loudly, not silently return empty/garbage.
         var credentials = CreateCredentialService();
-        var id = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = new CredentialAutofillService(credentials);
 
         Assert.Throws<VaultDecryptionFailedException>(
@@ -127,7 +128,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     {
         // Trust: autofill actions are logged.
         var credentials = CreateCredentialService();
-        var id = credentials.Add(VaultCredential, "GitHub", "credential-username-should-not-leak", "hunter2", "https://github.com");
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("credential-username-should-not-leak", "hunter2", "https://github.com"));
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
         var logger = new AuditLogger(sink, new LocalFakeAdminAlertSink());
         var service = new CredentialAutofillService(credentials, logger);
@@ -147,7 +148,7 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     public void FillCredential_WhenConsentDenied_StillLogsTheDenial()
     {
         var credentials = CreateCredentialService();
-        var id = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
         var logger = new AuditLogger(sink, new LocalFakeAdminAlertSink());
         var service = new CredentialAutofillService(credentials, logger);

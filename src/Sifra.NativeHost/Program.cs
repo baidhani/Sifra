@@ -52,6 +52,12 @@ while (true)
     stdout.Flush();
 }
 
+static string LoginValue(CredentialView view) =>
+    view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Login)?.Value ?? string.Empty;
+
+static string PasswordValue(CredentialView view) =>
+    view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Password)?.Value ?? string.Empty;
+
 static byte[]? ReadExactly(Stream stream, int count)
 {
     var buffer = new byte[count];
@@ -82,14 +88,14 @@ static string HandleRequest(string requestJson, CredentialAutofillService autofi
         {
             case "discover":
                 var offered = autofillService.OfferCredentialsForUrl(vaultCredential, url);
-                var payload = offered.Select(c => new { id = c.Id, label = c.Label, username = c.Username });
+                var payload = offered.Select(c => new { id = c.Id, label = c.Label, username = LoginValue(c) });
                 return JsonSerializer.Serialize(new { ok = true, credentials = payload });
 
             case "fill":
                 var credentialId = root.GetProperty("credentialId").GetString()!;
                 var consent = root.GetProperty("consent").GetBoolean();
                 var view = autofillService.FillCredential(vaultCredential, credentialId, url, consent);
-                return JsonSerializer.Serialize(new { ok = true, username = view.Username, password = view.Password });
+                return JsonSerializer.Serialize(new { ok = true, username = LoginValue(view), password = PasswordValue(view) });
 
             default:
                 return JsonSerializer.Serialize(new { ok = false, error = "UnknownAction", message = $"Unknown action '{action}'." });

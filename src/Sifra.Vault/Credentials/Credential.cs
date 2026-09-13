@@ -1,30 +1,25 @@
 namespace Sifra.Vault.Credentials;
 
 /// <summary>
-/// What is persisted for a credential. Username and password are stored
-/// only as AES-GCM ciphertext (see VaultEncryptionService) — never in
-/// plaintext. Label and Url are kept as plaintext metadata so the list
-/// view and search can work without decrypting every record just to
-/// render a list; both are lower-sensitivity than the secret fields.
+/// What is persisted for a credential. Fully dynamic field model: every
+/// piece of secret data (login, password, website, phone, notes, PIN,
+/// anything else) is just an entry in Fields, typed via CustomFieldType,
+/// and every field value is stored only as AES-GCM ciphertext (see
+/// VaultEncryptionService) — never in plaintext. There is no fixed
+/// "Username"/"Password"/"Url" shape any more; a credential can have any
+/// number of fields of any type, added and removed freely.
 ///
-/// Same convention extends to the additional fields below: Notes,
-/// AccountNumber, Pin, and every CustomField value are secrets (encrypted,
-/// like Password) since any of them could hold sensitive data. Phone,
-/// IsFavorite, and Labels are plaintext metadata, like Label/Url, since
-/// none of them are secrets and the list/filter views need them without
+/// Label, IsFavorite, and Tags remain fixed, plaintext metadata — not
+/// fields — since they identify and organize the credential itself rather
+/// than describing an account, and the list/filter views need them without
 /// a full decrypt.
 /// </summary>
 public sealed record Credential(
     string Id,
     string Label,
-    string EncryptedUsernameBase64,
-    string EncryptedPasswordBase64,
-    string? Url,
+    IReadOnlyList<CustomField> Fields,
     DateTimeOffset UpdatedAtUtc,
-    string? Phone = null,
-    string? EncryptedNotesBase64 = null,
-    string? EncryptedAccountNumberBase64 = null,
-    string? EncryptedPinBase64 = null,
-    IReadOnlyList<CustomField>? CustomFields = null,
+    DateTimeOffset CreatedAtUtc,
     bool IsFavorite = false,
-    IReadOnlyList<string>? Labels = null);
+    IReadOnlyList<string>? Tags = null,
+    CredentialIcon? Icon = null);

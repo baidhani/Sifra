@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using Sifra.Vault;
 using Sifra.Vault.Session;
 
@@ -14,6 +16,14 @@ public partial class SetupView : UserControl
     {
         InitializeComponent();
         _services = services;
+    }
+
+    private void OnPasswordBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            OnCreateVaultClick(sender, e);
+        }
     }
 
     private void OnCreateVaultClick(object sender, RoutedEventArgs e)
@@ -35,6 +45,16 @@ public partial class SetupView : UserControl
             RecoveryKeyText.Text = recoveryKey;
             IntroPanel.Visibility = Visibility.Collapsed;
             RecoveryPanel.Visibility = Visibility.Visible;
+            // Focusing this button (rather than leaving focus wherever it was
+            // on the now-collapsed intro panel) means Enter activates it via
+            // WPF's normal focused-button behavior — landing on Copy, not
+            // Continue, so pressing Enter here can't skip past the key before
+            // it's saved somewhere. Deferred to Loaded priority: calling
+            // Focus() synchronously right after Visibility = Visible silently
+            // fails (confirmed — HasKeyboardFocus stayed false) because the
+            // button hasn't been through a layout pass yet and isn't
+            // considered focusable until then.
+            Dispatcher.BeginInvoke(() => CopyToClipboardButton.Focus(), DispatcherPriority.Loaded);
         }
         catch (VaultAlreadyExistsException)
         {
@@ -44,6 +64,12 @@ public partial class SetupView : UserControl
         {
             ErrorText.Text = $"Could not create the vault: {ex.Message}";
         }
+    }
+
+    private void OnCopyToClipboardClick(object sender, RoutedEventArgs e)
+    {
+        Clipboard.SetText(RecoveryKeyText.Text);
+        CopyConfirmationText.Visibility = Visibility.Visible;
     }
 
     private void OnContinueClick(object sender, RoutedEventArgs e)

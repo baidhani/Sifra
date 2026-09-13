@@ -1,6 +1,7 @@
 using Sifra.Vault.Audit;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -31,25 +32,60 @@ public sealed class CredentialServiceTests : IDisposable
         auditLogger);
 
     [Fact]
-    public void Add_ThenList_ShowsTheNewCredentialWithDecryptedUsername()
+    public void Add_ThenList_ShowsTheNewCredentialWithDecryptedFields()
     {
         // Acceptance: adding a credential makes it appear in the list.
         var service = CreateService();
 
-        service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         var list = service.List(VaultCredential);
         Assert.Single(list);
         Assert.Equal("GitHub", list[0].Label);
-        Assert.Equal("firas", list[0].Username);
-        Assert.Null(list[0].Password); // list view never includes the password
+        Assert.Equal("firas", list[0].Username());
+        // With a fully dynamic field model there is no separate "safe" list
+        // view any more (see CredentialView's own remarks) — List and
+        // GetById both decrypt every field.
+        Assert.Equal("hunter2", list[0].Password());
+    }
+
+    [Fact]
+    public void Edit_DoesNotChangeTheCredentialsPositionInTheList()
+    {
+        // Regression: Upsert used to remove-then-append, which silently
+        // moved every edited credential to the end of the list — confusing
+        // in a long vault, since list order is meant to reflect creation
+        // order, not last-edited order.
+        var service = CreateService();
+        var firstId = service.Add(VaultCredential, "Alpha", LoginFields("a", "pw", "https://a.example.com"));
+        var middleId = service.Add(VaultCredential, "Beta", LoginFields("b", "pw", "https://b.example.com"));
+        var lastId = service.Add(VaultCredential, "Gamma", LoginFields("g", "pw", "https://g.example.com"));
+
+        service.Edit(VaultCredential, middleId, "Beta", LoginFields("b2", "pw2", "https://b.example.com"));
+
+        var ids = service.List(VaultCredential).Select(v => v.Id).ToList();
+        Assert.Equal(new[] { firstId, middleId, lastId }, ids);
+    }
+
+    [Fact]
+    public void Edit_PreservesTheOriginalCreatedAtUtc_WhileUpdatedAtUtcAdvances()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        var created = service.GetById(VaultCredential, id).CreatedAtUtc;
+
+        service.Edit(VaultCredential, id, "GitHub Renamed", LoginFields("firas", "hunter3", "https://github.com"));
+        var view = service.GetById(VaultCredential, id);
+
+        Assert.Equal(created, view.CreatedAtUtc);
+        Assert.True(view.UpdatedAtUtc >= created);
     }
 
     [Fact]
     public void Add_EncryptsUsernameAndPasswordAtRest()
     {
         var service = CreateService();
-        service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         var rawFileContents = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
 
@@ -61,7 +97,7 @@ public sealed class CredentialServiceTests : IDisposable
     public void CopyUsername_WritesDecryptedUsernameToClipboard()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         service.CopyUsername(VaultCredential, id);
 
@@ -72,7 +108,7 @@ public sealed class CredentialServiceTests : IDisposable
     public void CopyPassword_WritesDecryptedPasswordToClipboard()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         service.CopyPassword(VaultCredential, id);
 
@@ -94,7 +130,7 @@ public sealed class CredentialServiceTests : IDisposable
     {
         // Failure path: "clipboard access is denied by the system."
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         _clipboard.SimulateFailure = true;
 
         Assert.Throws<ClipboardUnavailableException>(() => service.CopyPassword(VaultCredential, id));
@@ -109,7 +145,7 @@ public sealed class CredentialServiceTests : IDisposable
         // copying cannot be affected by connectivity because nothing here
         // can observe it.
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         service.CopyUsername(VaultCredential, id); // no cloud object involved anywhere
 
@@ -120,20 +156,20 @@ public sealed class CredentialServiceTests : IDisposable
     public void Edit_UpdatesTheCredentialAndReEncrypts()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
-        service.Edit(VaultCredential, id, "GitHub", "firas-new", "hunter3", "https://github.com");
+        service.Edit(VaultCredential, id, "GitHub", LoginFields("firas-new", "hunter3", "https://github.com"));
 
         var updated = service.GetById(VaultCredential, id);
-        Assert.Equal("firas-new", updated.Username);
-        Assert.Equal("hunter3", updated.Password);
+        Assert.Equal("firas-new", updated.Username());
+        Assert.Equal("hunter3", updated.Password());
     }
 
     [Fact]
     public void Delete_RemovesTheCredentialFromTheList()
     {
         var service = CreateService();
-        var id = service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         service.Delete(id);
 
@@ -141,11 +177,11 @@ public sealed class CredentialServiceTests : IDisposable
     }
 
     [Fact]
-    public void Search_FindsByDecryptedUsernameOrPlaintextLabel()
+    public void Search_FindsByFieldValueOrPlaintextLabel()
     {
         var service = CreateService();
-        service.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
-        service.Add(VaultCredential, "Gmail", "firas.other@example.com", "hunter3", "https://gmail.com");
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        service.Add(VaultCredential, "Gmail", LoginFields("firas.other@example.com", "hunter3", "https://gmail.com"));
 
         var byLabel = service.Search(VaultCredential, "git");
         var byUsername = service.Search(VaultCredential, "other@example");
@@ -167,7 +203,7 @@ public sealed class CredentialServiceTests : IDisposable
 
         // Deliberately distinct from Environment.UserName (which the audit
         // log legitimately includes) so this assertion can't collide with it.
-        service.Add(VaultCredential, "GitHub", "credential-username-should-not-leak", "hunter2", "https://github.com");
+        service.Add(VaultCredential, "GitHub", LoginFields("credential-username-should-not-leak", "hunter2", "https://github.com"));
 
         var lines = sink.ReadAll();
         Assert.Single(lines);

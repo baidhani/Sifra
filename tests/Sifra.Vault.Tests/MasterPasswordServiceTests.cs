@@ -3,6 +3,7 @@ using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Session;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -59,7 +60,7 @@ public sealed class MasterPasswordServiceTests : IDisposable
         var authenticator = CreateAuthenticator();
         authenticator.SetCredential(OldPassword);
         var credentialService = CreateCredentialService();
-        var id = credentialService.Add(OldPassword, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentialService.Add(OldPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var ciphertextBefore = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
 
         var masterPasswordService = new MasterPasswordService(authenticator, CreateEncryption());
@@ -69,8 +70,8 @@ public sealed class MasterPasswordServiceTests : IDisposable
         Assert.Equal(ciphertextBefore, ciphertextAfter); // credentials.json was never rewritten
 
         var view = credentialService.GetById(NewPassword, id);
-        Assert.Equal("firas", view.Username);
-        Assert.Equal("hunter2", view.Password);
+        Assert.Equal("firas", view.Username());
+        Assert.Equal("hunter2", view.Password());
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Sharing;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -38,7 +39,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
     {
         // Acceptance: when shared, the recipient receives an encrypted copy.
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = CreateService(credentials);
 
         var shareId = service.CreateShare(VaultCredential, credentialId, "alice", RecipientPassphrase);
@@ -60,7 +61,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
         // Failure path: "sharing fails to encrypt credentials" (here, the
         // symmetric failure — a wrong key must not silently decrypt).
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = CreateService(credentials);
         var shareId = service.CreateShare(VaultCredential, credentialId, "alice", RecipientPassphrase);
 
@@ -82,7 +83,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
     {
         // Acceptance: when revoked, the recipient loses access.
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = CreateService(credentials);
         var shareId = service.CreateShare(VaultCredential, credentialId, "alice", RecipientPassphrase);
 
@@ -95,7 +96,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
     public void RevokeShare_CalledTwice_IsIdempotent()
     {
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var service = CreateService(credentials);
         var shareId = service.CreateShare(VaultCredential, credentialId, "alice", RecipientPassphrase);
 
@@ -128,7 +129,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
     {
         // Trust: sharing actions are logged.
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
         var logger = new AuditLogger(sink, new LocalFakeAdminAlertSink());
         var service = CreateService(credentials, logger);
@@ -149,7 +150,7 @@ public sealed class SharedCredentialServiceTests : IDisposable
     public void AcceptShare_AfterRevocation_StillLogsTheDeniedAttempt()
     {
         var credentials = CreateCredentialService();
-        var credentialId = credentials.Add(VaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
         var logger = new AuditLogger(sink, new LocalFakeAdminAlertSink());
         var service = CreateService(credentials, logger);

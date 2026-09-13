@@ -40,6 +40,13 @@ public sealed class SharedCredentialService
     public string CreateShare(string vaultCredential, string credentialId, string recipientLabel, string recipientPassphrase)
     {
         var credential = _credentials.GetById(vaultCredential, credentialId);
+        // Sharing still only covers the login/password/website shape — the first
+        // field of each type, same convention as CredentialService.CopyUsername/
+        // CopyPassword. A credential with no Login/Password field shares as empty
+        // strings for those rather than failing; known gap, not extended further here.
+        var username = credential.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Login)?.Value ?? string.Empty;
+        var password = credential.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Password)?.Value ?? string.Empty;
+        var url = credential.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Website)?.Value;
 
         var salt = RandomNumberGenerator.GetBytes(KekSaltLengthBytes);
         var key = DeriveKey(recipientPassphrase, salt);
@@ -49,10 +56,10 @@ public sealed class SharedCredentialService
             shareId,
             recipientLabel,
             credential.Label,
-            credential.Url,
+            url,
             Convert.ToBase64String(salt),
-            AesGcmCipher.Encrypt(credential.Username, key),
-            AesGcmCipher.Encrypt(credential.Password!, key),
+            AesGcmCipher.Encrypt(username, key),
+            AesGcmCipher.Encrypt(password, key),
             DateTimeOffset.UtcNow,
             Revoked: false,
             RevokedAtUtc: null));

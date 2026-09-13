@@ -48,10 +48,26 @@ public sealed class CredentialStore
         }
     }
 
-    /// <summary>Insert-or-replace by Id.</summary>
+    /// <summary>
+    /// Insert-or-replace by Id. Replaces in place when the credential
+    /// already exists, rather than removing and re-appending — otherwise
+    /// every edit would silently reorder the list to put the edited item
+    /// last, which is confusing since list order is meant to reflect
+    /// creation order, not last-edited order.
+    /// </summary>
     public void Upsert(Credential credential)
     {
-        var items = GetAll().Where(existing => existing.Id != credential.Id).Append(credential).ToList();
+        var items = GetAll().ToList();
+        var index = items.FindIndex(existing => existing.Id == credential.Id);
+        if (index >= 0)
+        {
+            items[index] = credential;
+        }
+        else
+        {
+            items.Add(credential);
+        }
+
         Save(items);
     }
 

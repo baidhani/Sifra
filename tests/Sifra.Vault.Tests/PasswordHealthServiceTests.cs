@@ -2,6 +2,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Health;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -33,7 +34,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WithAStrongPassword_IsNotFlaggedWeak()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "GitHub", "firas", "Tr0ub4dor&3-Zebra!", "https://github.com");
+        credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "Tr0ub4dor&3-Zebra!", "https://github.com"));
         var service = new PasswordHealthService(credentials);
 
         var reports = service.AnalyzeAll(VaultCredential);
@@ -44,11 +45,26 @@ public sealed class PasswordHealthServiceTests : IDisposable
     }
 
     [Fact]
+    public void AnalyzeAll_WithAnEmptyPassword_IsExcludedEntirely()
+    {
+        // An empty password field is an unfilled field, not a weak/reused
+        // password — it must not be analyzed or counted at all, rather than
+        // showing up as "weak" (too short) noise.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "", null));
+        var service = new PasswordHealthService(credentials);
+
+        var reports = service.AnalyzeAll(VaultCredential);
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
     public void AnalyzeAll_WithATooShortPassword_FlagsTooShort()
     {
         // Acceptance: weak passwords are identified.
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "Ab1!", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "Ab1!", null));
         var service = new PasswordHealthService(credentials);
 
         var report = service.AnalyzeAll(VaultCredential).Single();
@@ -61,7 +77,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WithALowVarietyPassword_FlagsLowCharacterVariety()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "aaaaaaaaaaaaaaaa", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "aaaaaaaaaaaaaaaa", null));
         var service = new PasswordHealthService(credentials);
 
         var report = service.AnalyzeAll(VaultCredential).Single();
@@ -74,7 +90,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WithAKnownCommonPassword_FlagsCommonPassword()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "password123", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "password123", null));
         var service = new PasswordHealthService(credentials);
 
         var report = service.AnalyzeAll(VaultCredential).Single();
@@ -87,8 +103,8 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WithTwoCredentialsSharingTheSamePassword_FlagsBothAsReused()
     {
         var credentials = CreateCredentialService();
-        var id1 = credentials.Add(VaultCredential, "Site A", "userA", "Tr0ub4dor&3-Zebra!", null);
-        var id2 = credentials.Add(VaultCredential, "Site B", "userB", "Tr0ub4dor&3-Zebra!", null);
+        var id1 = credentials.Add(VaultCredential, "Site A", LoginFields("userA", "Tr0ub4dor&3-Zebra!", null));
+        var id2 = credentials.Add(VaultCredential, "Site B", LoginFields("userB", "Tr0ub4dor&3-Zebra!", null));
         var service = new PasswordHealthService(credentials);
 
         var reports = service.AnalyzeAll(VaultCredential);
@@ -101,8 +117,8 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WithAllUniquePasswords_FlagsNoneAsReused()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site A", "userA", "Tr0ub4dor&3-Zebra!", null);
-        credentials.Add(VaultCredential, "Site B", "userB", "Different-Passw0rd!9", null);
+        credentials.Add(VaultCredential, "Site A", LoginFields("userA", "Tr0ub4dor&3-Zebra!", null));
+        credentials.Add(VaultCredential, "Site B", LoginFields("userB", "Different-Passw0rd!9", null));
         var service = new PasswordHealthService(credentials);
 
         var reports = service.AnalyzeAll(VaultCredential);
@@ -127,7 +143,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public void AnalyzeAll_WhenDecryptionFails_PropagatesRatherThanSilentlyIgnoringTheVault()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "whatever-password", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "whatever-password", null));
         var service = new PasswordHealthService(credentials);
 
         Assert.Throws<VaultDecryptionFailedException>(() => service.AnalyzeAll("wrong-vault-credential"));
@@ -138,8 +154,8 @@ public sealed class PasswordHealthServiceTests : IDisposable
     {
         // Trust: analysis results are logged without exposing plaintext passwords.
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "password123", null);
-        credentials.Add(VaultCredential, "Other", "user2", "Tr0ub4dor&3-Zebra!", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "password123", null));
+        credentials.Add(VaultCredential, "Other", LoginFields("user2", "Tr0ub4dor&3-Zebra!", null));
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
         var logger = new AuditLogger(sink, new LocalFakeAdminAlertSink());
         var service = new PasswordHealthService(credentials, logger);
@@ -161,7 +177,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     {
         // Acceptance: when breach awareness is enabled, compromised passwords are flagged.
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "leaked-password", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "leaked-password", null));
         var breachChecker = new FakeBreachChecker().WithResult(
             "leaked-password", new BreachCheckResult { Outcome = BreachCheckOutcome.Breached, BreachCount = 999 });
         var service = new PasswordHealthService(credentials);
@@ -178,7 +194,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
         // Failure path: "false positives in breach detection" — an
         // unreachable check must never be reported as a clean bill of health.
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "some-password", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "some-password", null));
         var breachChecker = new FakeBreachChecker().WithResult(
             "some-password", new BreachCheckResult { Outcome = BreachCheckOutcome.CheckUnavailable });
         var service = new PasswordHealthService(credentials);
@@ -193,7 +209,7 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public async Task AnalyzeAllAsync_NeverPassesAPasswordToTheAuditLogger()
     {
         var credentials = CreateCredentialService();
-        credentials.Add(VaultCredential, "Site", "user", "leaked-password", null);
+        credentials.Add(VaultCredential, "Site", LoginFields("user", "leaked-password", null));
         var breachChecker = new FakeBreachChecker().WithResult(
             "leaked-password", new BreachCheckResult { Outcome = BreachCheckOutcome.Breached, BreachCount = 5 });
         var sink = new FileAuditLogSink(Path.Combine(_dataDirectory, "operations.log"));
@@ -213,8 +229,8 @@ public sealed class PasswordHealthServiceTests : IDisposable
     public async Task AnalyzeAllAsync_WithTwoCredentialsSharingTheSamePassword_FlagsBothAsReused()
     {
         var credentials = CreateCredentialService();
-        var id1 = credentials.Add(VaultCredential, "Site A", "userA", "shared-password-1", null);
-        var id2 = credentials.Add(VaultCredential, "Site B", "userB", "shared-password-1", null);
+        var id1 = credentials.Add(VaultCredential, "Site A", LoginFields("userA", "shared-password-1", null));
+        var id2 = credentials.Add(VaultCredential, "Site B", LoginFields("userB", "shared-password-1", null));
         var breachChecker = new FakeBreachChecker();
         var service = new PasswordHealthService(credentials);
 

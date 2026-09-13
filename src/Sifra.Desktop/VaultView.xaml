@@ -11,6 +11,11 @@
         <Style x:Key="CategoryItem" TargetType="RadioButton" BasedOn="{StaticResource Sifra.NavItem}">
             <Setter Property="GroupName" Value="VaultCategory"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <!-- Tighter than the shared Sifra.NavItem default — this list
+                 can hold many tag entries, so a more compact row spacing
+                 keeps more of them visible without scrolling. -->
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Margin" Value="8,1,8,0"/>
         </Style>
     </UserControl.Resources>
 
@@ -48,7 +53,7 @@
         <!-- Three-pane layout -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="170" MinWidth="140" MaxWidth="320"/>
+                <ColumnDefinition Width="195" MinWidth="140" MaxWidth="320"/>
                 <ColumnDefinition Width="6"/>
                 <ColumnDefinition Width="300" MinWidth="220" MaxWidth="480"/>
                 <ColumnDefinition Width="6"/>
@@ -59,22 +64,57 @@
             <Border Grid.Column="0" Background="{DynamicResource Sifra.CardBrush}" BorderBrush="{DynamicResource Sifra.BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource Sifra.Corner.Medium}">
                 <StackPanel Margin="8">
                     <RadioButton x:Name="AllItemsCategory" Style="{StaticResource CategoryItem}" Tag="All" Checked="OnCategoryChanged">
-                        <TextBlock x:Name="AllItemsCategoryText" Text="All Items"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="All Items" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="AllItemsCategoryText" Grid.Column="1"/>
+                        </Grid>
                     </RadioButton>
                     <RadioButton x:Name="FavoritesCategory" Style="{StaticResource CategoryItem}" Tag="Favorites" Checked="OnCategoryChanged">
-                        <TextBlock x:Name="FavoritesCategoryText" Text="Favorites"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Favorites" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="FavoritesCategoryText" Grid.Column="1"/>
+                        </Grid>
                     </RadioButton>
                     <RadioButton x:Name="WeakCategory" Style="{StaticResource CategoryItem}" Tag="Weak" Checked="OnCategoryChanged">
-                        <TextBlock x:Name="WeakCategoryText" Text="Weak Passwords"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Weak Passwords" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="WeakCategoryText" Grid.Column="1"/>
+                        </Grid>
                     </RadioButton>
                     <RadioButton x:Name="ReusedCategory" Style="{StaticResource CategoryItem}" Tag="Reused" Checked="OnCategoryChanged">
-                        <TextBlock x:Name="ReusedCategoryText" Text="Reused Passwords"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Reused Passwords" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="ReusedCategoryText" Grid.Column="1"/>
+                        </Grid>
                     </RadioButton>
                     <RadioButton x:Name="CompromisedCategory" Style="{StaticResource CategoryItem}" Tag="Compromised" Checked="OnCategoryChanged">
-                        <TextBlock x:Name="CompromisedCategoryText" Text="Compromised"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Compromised" TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                            <TextBlock x:Name="CompromisedCategoryText" Grid.Column="1"/>
+                        </Grid>
                     </RadioButton>
-                    <ui:TextBlock Text="Labels" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="8,16,0,4"/>
-                    <StackPanel x:Name="LabelCategoryPanel"/>
+                    <ui:TextBlock Text="Tags" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="8,16,0,4"/>
+                    <StackPanel x:Name="TagCategoryPanel"/>
                 </StackPanel>
             </Border>
 
@@ -120,13 +160,49 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="8" Background="{DynamicResource Sifra.Brand.PrimaryBrush}" Margin="0,0,10,0">
-                                    <TextBlock Text="{Binding InitialLetter}" Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Grid.Column="0" Width="32" Height="32" CornerRadius="8" Background="{Binding AvatarBackground}" Margin="0,0,10,0" ClipToBounds="True">
+                                    <Grid>
+                                        <TextBlock Text="{Binding InitialLetter}" Visibility="{Binding AvatarLetterVisibility}"
+                                                   Foreground="White" FontWeight="Bold" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <ui:SymbolIcon Symbol="{Binding AvatarSymbol}" Filled="True" Visibility="{Binding AvatarSymbolVisibility}"
+                                                       FontSize="14" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        <Image Source="{Binding AvatarImage}" Visibility="{Binding AvatarImageVisibility}" Stretch="UniformToFill"
+                                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    </Grid>
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource Sifra.TextPrimaryBrush}"/>
-                                    <TextBlock Text="{Binding Username}" FontSize="11" Foreground="{DynamicResource Sifra.TextSecondaryBrush}"/>
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{DynamicResource Sifra.TextSecondaryBrush}"
+                                               Visibility="{Binding SubtitleVisibility}"/>
+                                    <!-- Compact, comma-separated icon+name per tag — a comma reads
+                                         naturally for a list of like items (unlike a "|" divider,
+                                         which suits separating unlike sections) and stays light
+                                         next to the colored icons. -->
+                                    <ItemsControl ItemsSource="{Binding TagChips}" Visibility="{Binding TagsVisibility}" Margin="0,1,0,0" AlternationCount="1000">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type local:TagChipViewModel}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock x:Name="Separator" Text=", " FontSize="11" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource Sifra.TextSecondaryBrush}"/>
+                                                    <ui:SymbolIcon Symbol="Tag24" Filled="True" FontSize="11" VerticalAlignment="Center"
+                                                                   Foreground="{Binding ColorBrush}" Margin="0,0,2,0"/>
+                                                    <TextBlock Text="{Binding Name}" FontSize="11" VerticalAlignment="Center"
+                                                               Foreground="{DynamicResource Sifra.TextSecondaryBrush}"/>
+                                                </StackPanel>
+                                                <DataTemplate.Triggers>
+                                                    <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                                        <Setter TargetName="Separator" Property="Visibility" Value="Collapsed"/>
+                                                    </Trigger>
+                                                </DataTemplate.Triggers>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
 
                                 <ui:SymbolIcon Grid.Column="2" Symbol="Star24" Visibility="{Binding FavoriteVisibility}"

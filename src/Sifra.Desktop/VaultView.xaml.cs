@@ -21,9 +21,18 @@ public partial class VaultView : UserControl
         _vaultCredential = vaultCredential;
 
         _detailView = new CredentialDetailView(services, vaultCredential);
-        _detailView.Changed += (_, _) => Refresh();
+        // Same reselect-after-rebuild fix as OnEditCredentialClick — this
+        // fires from the detail pane's own Edit button and its Favorite
+        // toggle, both of which would otherwise drop the selection too.
+        _detailView.Changed += (_, _) => Refresh((CredentialsList.SelectedItem as CredentialRow)?.Id);
         DetailHost.Child = _detailView;
         _detailView.ShowEmpty();
+
+        // A tag can be created from the modal "Set Tags" dialog while
+        // this screen sits behind it — refresh the sidebar the moment that
+        // happens rather than waiting for the Add/Edit Credential window to
+        // close.
+        _services.Tags.TagAdded += (_, _) => BuildTagCategories();
 
         // Set after InitializeComponent (not via XAML IsChecked="True") —
         // XAML's IsChecked raises Checked synchronously during parsing,
@@ -33,42 +42,100 @@ public partial class VaultView : UserControl
         Refresh();
     }
 
-    private void Refresh()
+    private void Refresh(string? reselectId = null)
     {
+        var tagColors = _services.Tags.List().ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
         _allRows = _services.Credentials.List(_vaultCredential)
-            .Select(v => new CredentialRow(v))
+            .Select(v => new CredentialRow(v, tagColors, _services.CredentialIcons))
             .ToList();
 
-        BuildLabelCategories();
+        BuildTagCategories();
         UpdateCategoryCounts();
         ApplyFilter();
+
+        // Rebuilding the list creates all-new CredentialRow instances, which
+        // would otherwise silently drop the selection on every edit — a real
+        // pain with a long vault, since finding the same item again means
+        // re-scrolling/re-searching for it.
+        if (reselectId is not null && CredentialsList.ItemsSource is IEnumerable<CredentialRow> rows)
+        {
+            CredentialsList.SelectedItem = rows.FirstOrDefault(r => r.Id == reselectId);
+        }
+
         _ = AnalyzeHealthAsync(_allRows);
     }
 
-    private void BuildLabelCategories()
+    private void BuildTagCategories()
     {
         var previousSelection = _category;
-        LabelCategoryPanel.Children.Clear();
+        TagCategoryPanel.Children.Clear();
 
-        var distinctLabels = _allRows.SelectMany(r => r.Labels).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(l => l).ToList();
-        foreach (var label in distinctLabels)
+        // The sidebar shows every registered tag, not just ones already in
+        // use — a newly created tag (0 credentials so far) should still
+        // appear immediately. Registered tags keep the registry's
+        // pinned-then-alphabetical order; any tag name found on a
+        // credential but missing from the registry (e.g. added via the CLI)
+        // is appended alphabetically so it doesn't silently disappear.
+        var registeredTags = _services.Tags.List();
+        var registeredNames = registeredTags.Select(t => t.Name).ToList();
+        var colorByName = registeredTags.ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
+        var usedNames = _allRows.SelectMany(r => r.Tags).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var unregisteredUsedNames = usedNames
+            .Where(n => !registeredNames.Contains(n, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
+        var distinctTags = registeredNames.Concat(unregisteredUsedNames).ToList();
+        foreach (var tag in distinctTags)
         {
-            var count = _allRows.Count(r => r.Labels.Contains(label, StringComparer.OrdinalIgnoreCase));
+            var count = _allRows.Count(r => r.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase));
+            // A tag used on a credential but missing from the registry (e.g.
+            // added via the CLI, which doesn't create a registry entry) has
+            // no known color — fall back to the default neutral swatch.
+            var colorHex = colorByName.TryGetValue(tag, out var c) ? c : "#7F8C8D";
+            var icon = new Wpf.Ui.Controls.SymbolIcon
+            {
+                Symbol = Wpf.Ui.Controls.SymbolRegular.Tag24,
+                Filled = true,
+                Foreground = (System.Windows.Media.SolidColorBrush)new System.Windows.Media.BrushConverter().ConvertFromString(colorHex)!,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            // Icon and label share the flexible column; the count gets its
+            // own Auto column so it lands flush against the row's right
+            // edge instead of trailing right after the label text.
+            var content = new Grid();
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(icon, 0);
+            var nameText = new TextBlock
+            {
+                Text = tag,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(0, 0, 6, 0),
+            };
+            Grid.SetColumn(nameText, 1);
+            var countText = new TextBlock { Text = count.ToString(), VerticalAlignment = VerticalAlignment.Center };
+            Grid.SetColumn(countText, 2);
+            content.Children.Add(icon);
+            content.Children.Add(nameText);
+            content.Children.Add(countText);
+
             var radio = new RadioButton
             {
                 Style = (Style)FindResource("CategoryItem"),
-                Tag = label,
-                Content = new TextBlock { Text = $"{label}  {count}" },
-                IsChecked = previousSelection == label,
+                Tag = tag,
+                Content = content,
+                IsChecked = previousSelection == tag,
             };
             radio.Checked += OnCategoryChanged;
-            LabelCategoryPanel.Children.Add(radio);
+            TagCategoryPanel.Children.Add(radio);
         }
 
-        // The label that was selected may no longer exist (e.g. its last credential was deleted) — fall back to All Items.
+        // The tag that was selected may no longer exist (e.g. its last credential was deleted) — fall back to All Items.
         if (previousSelection != "All" && previousSelection != "Favorites" && previousSelection != "Weak"
             && previousSelection != "Reused" && previousSelection != "Compromised"
-            && !distinctLabels.Contains(previousSelection, StringComparer.OrdinalIgnoreCase))
+            && !distinctTags.Contains(previousSelection, StringComparer.OrdinalIgnoreCase))
         {
             _category = "All";
             AllItemsCategory.IsChecked = true;
@@ -77,11 +144,11 @@ public partial class VaultView : UserControl
 
     private void UpdateCategoryCounts()
     {
-        AllItemsCategoryText.Text = $"All Items  {_allRows.Count}";
-        FavoritesCategoryText.Text = $"Favorites  {_allRows.Count(r => r.IsFavorite)}";
-        WeakCategoryText.Text = $"Weak Passwords  {_allRows.Count(r => r.IsWeak)}";
-        ReusedCategoryText.Text = $"Reused Passwords  {_allRows.Count(r => r.IsReused)}";
-        CompromisedCategoryText.Text = $"Compromised  {_allRows.Count(r => r.IsBreached)}";
+        AllItemsCategoryText.Text = _allRows.Count.ToString();
+        FavoritesCategoryText.Text = _allRows.Count(r => r.IsFavorite).ToString();
+        WeakCategoryText.Text = _allRows.Count(r => r.IsWeak).ToString();
+        ReusedCategoryText.Text = _allRows.Count(r => r.IsReused).ToString();
+        CompromisedCategoryText.Text = _allRows.Count(r => r.IsBreached).ToString();
     }
 
     private void OnCategoryChanged(object sender, RoutedEventArgs e)
@@ -99,7 +166,7 @@ public partial class VaultView : UserControl
             "Weak" => _allRows.Where(r => r.IsWeak),
             "Reused" => _allRows.Where(r => r.IsReused),
             "Compromised" => _allRows.Where(r => r.IsBreached),
-            _ => _allRows.Where(r => r.Labels.Contains(_category, StringComparer.OrdinalIgnoreCase)),
+            _ => _allRows.Where(r => r.Tags.Contains(_category, StringComparer.OrdinalIgnoreCase)),
         };
 
         var query = SearchBox.Text?.Trim() ?? string.Empty;
@@ -107,11 +174,14 @@ public partial class VaultView : UserControl
         {
             rows = rows.Where(r =>
                 r.Label.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                r.Username.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                (r.Url?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false));
+                r.Tags.Any(t => t.Contains(query, StringComparison.OrdinalIgnoreCase)) ||
+                r.FieldValues.Any(v => v.Contains(query, StringComparison.OrdinalIgnoreCase)));
         }
 
-        CredentialsList.ItemsSource = rows.ToList();
+        // Sorted alphabetically by title for easy scanning in a long vault —
+        // storage order (creation order) is untouched, this only affects
+        // what's displayed.
+        CredentialsList.ItemsSource = rows.OrderBy(r => r.Label, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     private async Task AnalyzeHealthAsync(List<CredentialRow> rows)
@@ -206,10 +276,11 @@ public partial class VaultView : UserControl
             Owner = Window.GetWindow(this),
         };
 
-        if (window.ShowDialog() == true)
-        {
-            Refresh();
-        }
+        // Refresh regardless of dialog result — the user may have created a
+        // new label via "Set labels" and then cancelled the credential
+        // itself; the label registry change should still show up.
+        window.ShowDialog();
+        Refresh();
     }
 
     private void OnEditCredentialClick(object sender, RoutedEventArgs e)
@@ -225,10 +296,12 @@ public partial class VaultView : UserControl
             Owner = Window.GetWindow(this),
         };
 
-        if (window.ShowDialog() == true)
-        {
-            Refresh();
-        }
+        // Refresh regardless of dialog result — see OnAddCredentialClick.
+        // Re-select the edited item afterward: rebuilding the list otherwise
+        // drops the selection, which is a real pain to recover in a long
+        // vault (re-scroll or re-search to find the same item again).
+        window.ShowDialog();
+        Refresh(selected.Id);
     }
 
     private void OnDeleteCredentialClick(object sender, RoutedEventArgs e)
@@ -248,6 +321,9 @@ public partial class VaultView : UserControl
         if (result == MessageBoxResult.Yes)
         {
             _services.Credentials.Delete(selected.Id);
+            _services.Attachments.DeleteAllForCredential(selected.Id); // no orphaned encrypted blobs left on disk
+            _services.PasswordHistory.DeleteAllForCredential(selected.Id); // no orphaned history entries left on disk
+            _services.CredentialIcons.DeleteAllForCredential(selected.Id); // no orphaned icon image left on disk
             _detailView.ShowEmpty();
             Refresh();
         }

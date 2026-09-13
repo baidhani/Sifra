@@ -9,7 +9,7 @@
     <Grid>
         <ui:Card HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
-                <Image Source="Assets/Brand/sifra_icon_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Unlock your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,20"/>
 
                 <ui:TextBlock Text="Master password" FontTypography="BodyStrong" Margin="0,0,0,6"/>

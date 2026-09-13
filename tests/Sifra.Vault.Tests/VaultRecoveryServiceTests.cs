@@ -3,6 +3,7 @@ using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Session;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -47,7 +48,7 @@ public sealed class VaultRecoveryServiceTests : IDisposable
         var recovery = new VaultRecoveryService(vaultService, authenticator, CreateEncryption());
         recovery.EstablishRecoverySlot(recoveryKey, InitialPassword);
 
-        var credentialId = CreateCredentialService().Add(InitialPassword, "GitHub", "firas", "hunter2", "https://github.com");
+        var credentialId = CreateCredentialService().Add(InitialPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         return (recovery, authenticator, recoveryKey, credentialId);
     }
@@ -66,8 +67,8 @@ public sealed class VaultRecoveryServiceTests : IDisposable
         Assert.False(authenticator.Authenticate(InitialPassword));
 
         var view = CreateCredentialService().GetById(NewPassword, credentialId);
-        Assert.Equal("firas", view.Username);
-        Assert.Equal("hunter2", view.Password);
+        Assert.Equal("firas", view.Username());
+        Assert.Equal("hunter2", view.Password());
     }
 
     [Fact]

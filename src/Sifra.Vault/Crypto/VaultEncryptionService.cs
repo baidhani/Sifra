@@ -87,6 +87,14 @@ public sealed class VaultEncryptionService
     /// </exception>
     public string Decrypt(string base64CipherBlob, byte[] key) => AesGcmCipher.Decrypt(base64CipherBlob, key);
 
+    /// <summary>Same cipher as Encrypt, for raw binary data (attachments) instead of text.</summary>
+    public byte[] EncryptBytes(byte[] plaintext, byte[] key) => AesGcmCipher.EncryptBytes(plaintext, key);
+
+    /// <exception cref="VaultDecryptionFailedException">
+    /// The ciphertext could not be authenticated — usually the wrong key (wrong vault credential).
+    /// </exception>
+    public byte[] DecryptBytes(byte[] combined, byte[] key) => AesGcmCipher.DecryptBytes(combined, key);
+
     private void PersistWrapped(string slotId, byte[] vmk, string vaultCredential)
     {
         var salt = RandomNumberGenerator.GetBytes(KekSaltLengthBytes);

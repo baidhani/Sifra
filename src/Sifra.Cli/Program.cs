@@ -103,7 +103,7 @@ var credentials = new CredentialService(
 
 const string vaultCredential = "demo-password"; // same credential just proven via vaultAuth.Authenticate above
 
-var credentialId = credentials.Add(vaultCredential, "GitHub", "firas", "hunter2", "https://github.com");
+var credentialId = credentials.Add(vaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 Console.WriteLine($"Added credential. List now shows {credentials.List(vaultCredential).Count} item(s).");
 
 var rawCredentialsFile = File.ReadAllText(Path.Combine(resolvedDataDirectory, "credentials.json"));
@@ -162,7 +162,7 @@ catch (VaultLockedException ex)
 
 Console.WriteLine($"Unlock with wrong password: {freshSession.Unlock("not-the-password")} (state stays {freshSession.State})");
 
-var secondCredentialId = credentials.Add("demo-password", "Gmail", "firas", "hunter3", "https://gmail.com");
+var secondCredentialId = credentials.Add("demo-password", "Gmail", LoginFields("firas", "hunter3", "https://gmail.com"));
 Console.WriteLine($"Unlock with correct password: {freshSession.Unlock("demo-password")} (state now {freshSession.State})");
 Console.WriteLine($"All credentials accessible after unlock: {credentials.List(freshSession.RequireUnlockedCredential()).Count} item(s).");
 
@@ -173,7 +173,7 @@ credentials.Delete(secondCredentialId); // tidy up so later demo sections still 
 Console.WriteLine();
 Console.WriteLine("--- STORY-005: change master password (without re-encrypting credentials) ---");
 
-var thirdCredentialId = credentials.Add("demo-password", "GitHub", "firas", "hunter2", "https://github.com");
+var thirdCredentialId = credentials.Add("demo-password", "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 var credentialsFileBeforeChange = File.ReadAllText(Path.Combine(resolvedDataDirectory, "credentials.json"));
 
 var masterPasswordService = new MasterPasswordService(vaultAuth, new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)), auditLogger);
@@ -205,14 +205,14 @@ var credentialsFileAfterChange = File.ReadAllText(Path.Combine(resolvedDataDirec
 Console.WriteLine($"credentials.json unchanged by the password change (REQ-008 — no re-encryption): {credentialsFileBeforeChange == credentialsFileAfterChange}");
 
 var viewWithNewPassword = credentials.GetById("new-demo-password-123", thirdCredentialId);
-Console.WriteLine($"Existing credential still decrypts correctly under the new password: username=\"{viewWithNewPassword.Username}\"");
+Console.WriteLine($"Existing credential still decrypts correctly under the new password: username=\"{LoginValue(viewWithNewPassword)}\"");
 
 credentials.Delete(thirdCredentialId); // tidy up
 
 Console.WriteLine();
 Console.WriteLine("--- STORY-006: recover vault with recovery key ---");
 
-var recoveryDemoCredentialId = credentials.Add("new-demo-password-123", "GitHub", "firas", "hunter2", "https://github.com");
+var recoveryDemoCredentialId = credentials.Add("new-demo-password-123", "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
 if (demoRecoveryKey is not null)
 {
@@ -231,7 +231,7 @@ if (demoRecoveryKey is not null)
     Console.WriteLine($"New recovered password accepted: {vaultAuth.Authenticate("recovered-password-456")}");
 
     var recoveredView = credentials.GetById("recovered-password-456", recoveryDemoCredentialId);
-    Console.WriteLine($"Existing credential still accessible after recovery: username=\"{recoveredView.Username}\"");
+    Console.WriteLine($"Existing credential still accessible after recovery: username=\"{LoginValue(recoveredView)}\"");
 
     try
     {
@@ -383,8 +383,8 @@ Console.WriteLine();
 Console.WriteLine("--- STORY-011: analyze password health and breach awareness ---");
 
 const string healthDemoVaultCredential = "recovered-password-456"; // the password active at this point in the demo (post STORY-006 recovery)
-var weakDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Weak Example", "demo", "password123", null);
-var strongDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Strong Example", "demo", "Xk7#mQ9!vL2$pR4wZ8@nB6", null);
+var weakDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Weak Example", LoginFields("demo", "password123", null));
+var strongDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Strong Example", LoginFields("demo", "Xk7#mQ9!vL2$pR4wZ8@nB6", null));
 
 var healthService = new PasswordHealthService(credentials, auditLogger);
 var localReports = healthService.AnalyzeAll(healthDemoVaultCredential);
@@ -408,7 +408,7 @@ credentials.Delete(strongDemoCredentialId);
 Console.WriteLine();
 Console.WriteLine("--- STORY-012: share a credential securely ---");
 
-var sharingDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Shared Wi-Fi", "guest", "guest-network-pass", null);
+var sharingDemoCredentialId = credentials.Add(healthDemoVaultCredential, "Shared Wi-Fi", LoginFields("guest", "guest-network-pass", null));
 var sharedCredentialService = new SharedCredentialService(credentials, new ShareRegistryStore(dataDirectory), auditLogger);
 
 const string recipientPassphrase = "tell-alice-this-out-of-band";
@@ -462,6 +462,23 @@ catch (AuditLoggingFailedException ex)
     Console.WriteLine($"Logging failed after retries, as expected: {ex.Message}");
     Console.WriteLine($"Admin was alerted: \"{adminAlerts.Alerts[^1]}\"");
 }
+
+static IReadOnlyList<(string Name, string Value, CustomFieldType Type)> LoginFields(string username, string password, string? url)
+{
+    var fields = new List<(string, string, CustomFieldType)>
+    {
+        ("Username", username, CustomFieldType.Login),
+        ("Password", password, CustomFieldType.Password),
+    };
+    if (url is not null)
+    {
+        fields.Add(("Website", url, CustomFieldType.Website));
+    }
+    return fields;
+}
+
+static string LoginValue(CredentialView view) =>
+    view.Fields.First(f => f.Type == CustomFieldType.Login).Value;
 
 static string? FindGoogleOAuthSecretsFile() => FindSecretsFile("google-oauth.json");
 

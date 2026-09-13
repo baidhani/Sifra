@@ -1,0 +1,64 @@
+<ui:FluentWindow x:Class="Sifra.Desktop.SelectSymbolWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        mc:Ignorable="d"
+        Title="Select Symbol" Height="620" Width="500" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
+        Background="{DynamicResource Sifra.WindowBrush}">
+    <ui:FluentWindow.Resources>
+        <Style x:Key="CategoryTabButton" TargetType="RadioButton">
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Margin" Value="0,0,6,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource Sifra.TextPrimaryBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Root" Background="{DynamicResource Sifra.CardBrush}" BorderBrush="{DynamicResource Sifra.BorderBrush}"
+                                BorderThickness="1" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Sifra.SelectedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ui:FluentWindow.Resources>
+    <Grid Background="{DynamicResource Sifra.WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Select Symbol" Background="{DynamicResource Sifra.WindowBrush}"
+                     ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Margin="20">
+            <ui:TextBlock Text="Symbols" FontTypography="Subtitle" Margin="0,0,0,12"/>
+
+            <WrapPanel x:Name="CategoryTabsPanel" Margin="0,0,0,10"/>
+
+            <Border Background="{DynamicResource Sifra.CardBrush}" BorderBrush="{DynamicResource Sifra.BorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Height="280">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                    <WrapPanel x:Name="IconGridPanel"/>
+                </ScrollViewer>
+            </Border>
+
+            <ui:TextBlock Text="Color" FontTypography="BodyStrong" Margin="0,16,0,10"/>
+            <WrapPanel x:Name="ColorSwatchesPanel"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">
+            <ui:Button x:Name="OkButton" Content="OK" Appearance="Primary" Margin="0,0,10,0" Click="OnOkClick"/>
+            <ui:Button Content="Cancel" Click="OnCancelClick"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

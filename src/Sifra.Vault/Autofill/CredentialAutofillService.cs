@@ -29,7 +29,7 @@ public sealed class CredentialAutofillService
     {
         var host = GetHost(url);
         var matches = _credentials.List(vaultCredential)
-            .Where(c => c.Url is not null && string.Equals(GetHost(c.Url), host, StringComparison.OrdinalIgnoreCase))
+            .Where(c => HasMatchingWebsiteField(c, host))
             .ToList();
 
         _auditLogger?.Log(nameof(OfferCredentialsForUrl), Environment.UserName, details: $"host={host} offered={matches.Count}");
@@ -68,9 +68,14 @@ public sealed class CredentialAutofillService
     {
         var host = GetHost(url);
         return _credentials.List(vaultCredential)
-            .Where(c => c.Url is not null && string.Equals(GetHost(c.Url), host, StringComparison.OrdinalIgnoreCase))
+            .Where(c => HasMatchingWebsiteField(c, host))
             .ToList();
     }
+
+    private static bool HasMatchingWebsiteField(CredentialView credential, string host) =>
+        credential.Fields
+            .Where(f => f.Type == CustomFieldType.Website)
+            .Any(f => string.Equals(GetHost(f.Value), host, StringComparison.OrdinalIgnoreCase));
 
     private static string GetHost(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : url;

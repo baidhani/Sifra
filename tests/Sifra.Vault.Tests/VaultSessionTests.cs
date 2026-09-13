@@ -2,6 +2,7 @@ using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Session;
+using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
 
@@ -57,7 +58,7 @@ public sealed class VaultSessionTests : IDisposable
         var authenticator = CreateAuthenticator();
         authenticator.SetCredential(MasterPassword);
         var credentialService = CreateCredentialService();
-        credentialService.Add(MasterPassword, "GitHub", "firas", "hunter2", "https://github.com");
+        credentialService.Add(MasterPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         var session = new VaultSession(authenticator);
         var unlocked = session.Unlock(MasterPassword);
@@ -67,7 +68,7 @@ public sealed class VaultSessionTests : IDisposable
 
         var list = credentialService.List(session.RequireUnlockedCredential());
         Assert.Single(list);
-        Assert.Equal("firas", list[0].Username);
+        Assert.Equal("firas", list[0].Username());
     }
 
     [Fact]
@@ -121,7 +122,7 @@ public sealed class VaultSessionTests : IDisposable
         // memory is shared with the "first run."
         var firstRunAuthenticator = CreateAuthenticator();
         firstRunAuthenticator.SetCredential(MasterPassword);
-        CreateCredentialService().Add(MasterPassword, "GitHub", "firas", "hunter2", "https://github.com");
+        CreateCredentialService().Add(MasterPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         // "Reopen" — brand-new instances, same directory.
         var secondRunSession = new VaultSession(CreateAuthenticator());
@@ -131,7 +132,7 @@ public sealed class VaultSessionTests : IDisposable
         var list = CreateCredentialService().List(secondRunSession.RequireUnlockedCredential());
 
         Assert.Single(list);
-        Assert.Equal("firas", list[0].Username);
+        Assert.Equal("firas", list[0].Username());
     }
 
     [Fact]
@@ -144,9 +145,9 @@ public sealed class VaultSessionTests : IDisposable
         var authenticator = CreateAuthenticator();
         authenticator.SetCredential(MasterPassword);
         var credentialService = CreateCredentialService();
-        var id = credentialService.Add(MasterPassword, "GitHub", "firas", "hunter2", "https://github.com");
+        var id = credentialService.Add(MasterPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
-        // Flip one character of the encrypted password value on the
+        // Flip one character of the first field's encrypted value on the
         // deserialized object, not the raw JSON text — System.Text.Json
         // escapes some base64 characters (e.g. '+' as "+"), so
         // editing raw text could corrupt the JSON escape sequence itself
@@ -154,9 +155,13 @@ public sealed class VaultSessionTests : IDisposable
         var filePath = Path.Combine(_dataDirectory, "credentials.json");
         var records = System.Text.Json.JsonSerializer.Deserialize<List<Sifra.Vault.Credentials.Credential>>(File.ReadAllText(filePath))!;
         var record = records[0];
-        var chars = record.EncryptedPasswordBase64.ToCharArray();
+        var passwordField = record.Fields.First(f => f.Type == CustomFieldType.Password);
+        var chars = passwordField.EncryptedValueBase64.ToCharArray();
         chars[0] = chars[0] == 'A' ? 'B' : 'A';
-        records[0] = record with { EncryptedPasswordBase64 = new string(chars) };
+        var tamperedFields = record.Fields
+            .Select(f => f == passwordField ? f with { EncryptedValueBase64 = new string(chars) } : f)
+            .ToList();
+        records[0] = record with { Fields = tamperedFields };
         File.WriteAllText(filePath, System.Text.Json.JsonSerializer.Serialize(records));
 
         var session = new VaultSession(authenticator);

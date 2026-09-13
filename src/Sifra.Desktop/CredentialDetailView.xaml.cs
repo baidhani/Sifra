@@ -1,16 +1,34 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using Sifra.Vault.Attachments;
 using Sifra.Vault.Credentials;
 
 namespace Sifra.Desktop;
+
+/// <summary>Row view model backing one tag chip in the detail pane's Tags section.</summary>
+public sealed class TagChipViewModel
+{
+    public required string Name { get; init; }
+    public required System.Windows.Media.Brush ColorBrush { get; init; }
+}
 
 /// <summary>
 /// Read-only display of one credential's full decrypted data. Editing
 /// happens through AddCredentialWindow (opened via the Edit button here or
 /// the toolbar) rather than inline, to avoid building a second, separate
 /// live-editing surface for the same fields.
+///
+/// Fully dynamic field model: there is no fixed Username/Password/Url/
+/// Phone/AccountNumber/Pin/Notes shape any more, so every field (whatever
+/// its name or type) renders through the same BuildFieldRow logic below —
+/// masked with click-to-reveal for Password/Pin/Secret, a live TOTP code
+/// for OneTimePassword, a clickable link for Website, plain text otherwise,
+/// and a copy button on every row.
 /// </summary>
 public partial class CredentialDetailView : UserControl
 {
@@ -18,8 +36,6 @@ public partial class CredentialDetailView : UserControl
     private readonly string _vaultCredential;
     private readonly DispatcherTimer _otpTimer;
     private CredentialView? _current;
-    private bool _passwordRevealed;
-    private bool _pinRevealed;
 
     public event EventHandler? Changed;
 
@@ -44,8 +60,6 @@ public partial class CredentialDetailView : UserControl
     public void ShowCredential(string credentialId)
     {
         _current = _services.Credentials.GetById(_vaultCredential, credentialId);
-        _passwordRevealed = false;
-        _pinRevealed = false;
 
         EmptyStateText.Visibility = Visibility.Collapsed;
         DetailScroll.Visibility = Visibility.Visible;
@@ -58,10 +72,11 @@ public partial class CredentialDetailView : UserControl
         var c = _current;
         if (c is null) return;
 
-        AvatarText.Text = c.Label.Length > 0 ? c.Label[..1].ToUpperInvariant() : "?";
+        RenderAvatar(c);
         TitleText.Text = c.Label;
         HealthText.Text = $"Updated {c.UpdatedAtUtc:g}";
-        UpdatedText.Text = $"Last updated: {c.UpdatedAtUtc:g}";
+        UpdatedText.Text = $"Modified: {c.UpdatedAtUtc:g}";
+        CreatedText.Text = $"Created: {c.CreatedAtUtc:g}";
 
         FavoriteButton.Icon = new Wpf.Ui.Controls.SymbolIcon
         {
@@ -71,37 +86,295 @@ public partial class CredentialDetailView : UserControl
                 : (System.Windows.Media.Brush)FindResource("Sifra.TextSecondaryBrush"),
         };
 
-        UsernameText.Text = c.Username;
+        var tags = c.Tags ?? Array.Empty<string>();
+        TagsPanel.Visibility = tags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        // A tag missing from the registry (e.g. added via the CLI) has no
+        // known color — fall back to the same neutral gray used elsewhere.
+        var colorByName = _services.Tags.List().ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
+        TagsList.ItemsSource = tags.Select(t => new TagChipViewModel
+        {
+            Name = t,
+            ColorBrush = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(
+                    colorByName.TryGetValue(t, out var hex) ? hex : "#7F8C8D")),
+        }).ToList();
 
-        RenderPassword();
-        RenderPin();
+        // "Notes" is pulled out of the generic Fields list and given its own
+        // section here, mirroring the same special treatment the Add/Edit
+        // window's Notes tab gives it — it's still just a field named
+        // "Notes" under the hood, this is purely a display-layer split.
+        var notesField = c.Fields.FirstOrDefault(f => string.Equals(f.Name, "Notes", StringComparison.OrdinalIgnoreCase));
+        var hasNotes = notesField is { Value.Length: > 0 };
+        NotesPanel.Visibility = hasNotes ? Visibility.Visible : Visibility.Collapsed;
+        NotesText.Text = notesField?.Value;
 
-        UrlPanel.Visibility = string.IsNullOrEmpty(c.Url) ? Visibility.Collapsed : Visibility.Visible;
-        UrlLink.Content = c.Url;
+        // An empty field is just noise — nothing to reveal, copy, or act on
+        // — so it's hidden here entirely rather than shown blank, and (see
+        // PasswordHealthService) excluded from weak/reused/breach analysis.
+        FieldsList.ItemsSource = c.Fields.Where(f => f != notesField && f.Value.Length > 0).Select(BuildFieldRow).ToList();
 
-        PhonePanel.Visibility = string.IsNullOrEmpty(c.Phone) ? Visibility.Collapsed : Visibility.Visible;
-        PhoneText.Text = c.Phone;
-
-        AccountNumberPanel.Visibility = string.IsNullOrEmpty(c.AccountNumber) ? Visibility.Collapsed : Visibility.Visible;
-        AccountNumberText.Text = c.AccountNumber;
-
-        PinPanel.Visibility = string.IsNullOrEmpty(c.Pin) ? Visibility.Collapsed : Visibility.Visible;
-
-        NotesPanel.Visibility = string.IsNullOrEmpty(c.Notes) ? Visibility.Collapsed : Visibility.Visible;
-        NotesText.Text = c.Notes;
-
-        var labels = c.Labels ?? Array.Empty<string>();
-        LabelsPanel.Visibility = labels.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        LabelsList.ItemsSource = labels;
-
-        var customFields = c.CustomFields ?? Array.Empty<CustomFieldView>();
-        CustomFieldsHeader.Visibility = customFields.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        CustomFieldsList.ItemsSource = customFields.Select(BuildCustomFieldRow).ToList();
+        RenderAttachments();
     }
 
-    private FrameworkElement BuildCustomFieldRow(CustomFieldView field)
+    // Builds the avatar's visual content according to the credential's Icon
+    // metadata: a custom/website-fetched image, a Fluent symbol on a
+    // colored circle, or the default initial-letter-on-color fallback.
+    private void RenderAvatar(CredentialView c)
     {
-        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 10), Tag = field };
+        var icon = c.Icon;
+        AvatarBorder.Background = new System.Windows.Media.SolidColorBrush(
+            (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(
+                icon?.BackgroundColorHex ?? "#5B8DEF"));
+
+        if (icon?.Kind is CredentialIconKind.WebsiteFavicon or CredentialIconKind.Custom)
+        {
+            var bytes = _services.CredentialIcons.GetImage(c.Id);
+            if (bytes is not null)
+            {
+                try
+                {
+                    var bitmap = new BitmapImage();
+                    using (var stream = new MemoryStream(bytes))
+                    {
+                        bitmap.BeginInit();
+                        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                        bitmap.StreamSource = stream;
+                        bitmap.EndInit();
+                    }
+
+                    var image = new Image { Source = bitmap, Stretch = System.Windows.Media.Stretch.UniformToFill };
+                    RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+                    AvatarBorder.Background = System.Windows.Media.Brushes.Transparent;
+                    AvatarBorder.Child = image;
+                    return;
+                }
+                catch (Exception ex) when (ex is NotSupportedException or FileFormatException)
+                {
+                    // Failure path: a corrupted icon image falls through to the letter/symbol below rather than crashing.
+                }
+            }
+        }
+
+        if (icon?.Kind == CredentialIconKind.Symbol && icon.SymbolName is not null
+            && Enum.TryParse<Wpf.Ui.Controls.SymbolRegular>(icon.SymbolName, out var symbol))
+        {
+            AvatarBorder.Child = new Wpf.Ui.Controls.SymbolIcon
+            {
+                Symbol = symbol,
+                FontSize = 20,
+                Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            return;
+        }
+
+        AvatarBorder.Child = new TextBlock
+        {
+            Text = c.Label.Length > 0 ? c.Label[..1].ToUpperInvariant() : "?",
+            Foreground = System.Windows.Media.Brushes.White,
+            FontWeight = FontWeights.Bold,
+            FontSize = 18,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+    }
+
+    private void OnAvatarClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        AvatarBorder.ContextMenu!.PlacementTarget = AvatarBorder;
+        AvatarBorder.ContextMenu.IsOpen = true;
+    }
+
+    private async void OnUseWebsiteIconClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null) return;
+
+        var websiteUrl = _current.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Website)?.Value;
+        if (string.IsNullOrWhiteSpace(websiteUrl))
+        {
+            MessageBox.Show(Window.GetWindow(this), "This credential has no Website field to fetch an icon from.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var found = await _services.CredentialIcons.SetFromWebsiteAsync(_current.Id, websiteUrl, CancellationToken.None);
+        if (!found)
+        {
+            MessageBox.Show(Window.GetWindow(this), "Could not find an icon for this website.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        ShowCredential(_current.Id);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnSelectSymbolClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null) return;
+
+        var dialog = new SelectSymbolWindow(_current.Icon?.SymbolName, _current.Icon?.BackgroundColorHex) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() == true && dialog.SelectedSymbolName is not null)
+        {
+            _services.CredentialIcons.SetSymbol(_current.Id, dialog.SelectedSymbolName, dialog.SelectedColorHex);
+            ShowCredential(_current.Id);
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void OnSelectColorClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null) return;
+
+        var dialog = new SelectColorWindow(_current.Icon?.BackgroundColorHex) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() == true)
+        {
+            _services.CredentialIcons.SetColor(_current.Id, dialog.SelectedColorHex);
+            ShowCredential(_current.Id);
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private void OnUseCustomIconClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null) return;
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Use custom icon",
+            Filter = "Image files|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp|All files|*.*",
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var bytes = File.ReadAllBytes(dialog.FileName);
+            _services.CredentialIcons.SetCustom(_current.Id, bytes);
+            ShowCredential(_current.Id);
+            Changed?.Invoke(this, EventArgs.Empty);
+        }
+        catch (IOException)
+        {
+            // Failure path: an unreadable source file (deleted/locked between picking it and reading it) must not crash the app.
+            MessageBox.Show(Window.GetWindow(this), "Could not read that file.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RenderAttachments()
+    {
+        if (_current is null) return;
+
+        var attachments = _services.Attachments.List(_current.Id);
+
+        var images = attachments.Where(a => a.Kind == AttachmentKind.Image).ToList();
+        ImagesPanel.Visibility = images.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        ImagesList.ItemsSource = images.Select(BuildImageThumbnail).ToList();
+
+        var files = attachments.Where(a => a.Kind == AttachmentKind.File).ToList();
+        FilesPanel.Visibility = files.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FilesList.ItemsSource = files.Select(BuildFileRow).ToList();
+    }
+
+    private FrameworkElement BuildImageThumbnail(CredentialAttachment attachment)
+    {
+        var container = new Border
+        {
+            Width = 80,
+            Height = 80,
+            Margin = new Thickness(0, 0, 8, 8),
+            CornerRadius = new CornerRadius(6),
+            ClipToBounds = true,
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = attachment.FileName,
+        };
+
+        try
+        {
+            var bytes = _services.Attachments.GetDecryptedBytes(_vaultCredential, attachment.Id);
+            var bitmap = new BitmapImage();
+            using (var stream = new MemoryStream(bytes))
+            {
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream;
+                bitmap.EndInit();
+            }
+
+            container.Child = new System.Windows.Controls.Image { Source = bitmap, Stretch = System.Windows.Media.Stretch.UniformToFill };
+        }
+        catch (Exception ex) when (ex is NotSupportedException or FileFormatException)
+        {
+            // Failure path: a corrupted/unrecognized image must not crash the app.
+            container.Child = new TextBlock { Text = "?", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        }
+
+        container.MouseLeftButtonUp += (_, _) => SaveAttachment(attachment);
+        return container;
+    }
+
+    private FrameworkElement BuildFileRow(CredentialAttachment attachment)
+    {
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var nameText = new Wpf.Ui.Controls.TextBlock { Text = attachment.FileName, VerticalAlignment = VerticalAlignment.Center };
+        nameText.SetResourceReference(Control.ForegroundProperty, "Sifra.TextPrimaryBrush");
+        Grid.SetColumn(nameText, 0);
+        row.Children.Add(nameText);
+
+        AddButtonColumn(row, "ArrowDownload24", "Save", () => SaveAttachment(attachment));
+
+        return row;
+    }
+
+    // Attachments are never opened/executed in place — a stored file could be
+    // of any type (script, executable, macro document), so the only supported
+    // action is saving the decrypted bytes to a location the user picks.
+    private void SaveAttachment(CredentialAttachment attachment)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog { FileName = attachment.FileName };
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            var bytes = _services.Attachments.GetDecryptedBytes(_vaultCredential, attachment.Id);
+            File.WriteAllBytes(dialog.FileName, bytes);
+        }
+        catch (IOException)
+        {
+            // Failure path: destination locked/unwritable must not crash the app.
+            MessageBox.Show(Window.GetWindow(this), "Could not save this attachment.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    // Every section of the detail pane (each field, Notes, Images, Files)
+    // gets its own bottom-border divider so they read as clearly separate
+    // blocks, matching the reference design, rather than blurring together
+    // with just vertical spacing.
+    private FrameworkElement BuildFieldRow(CustomFieldView field) => WrapWithDivider(BuildFieldContent(field));
+
+    private static Border WrapWithDivider(FrameworkElement content)
+    {
+        var border = new Border
+        {
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 0, 0, 14),
+            Margin = new Thickness(0, 0, 0, 14),
+            Child = content,
+        };
+        border.SetResourceReference(Border.BorderBrushProperty, "Sifra.BorderBrush");
+        return border;
+    }
+
+    private FrameworkElement BuildFieldContent(CustomFieldView field)
+    {
+        var panel = new StackPanel { Tag = field };
         var caption = new Wpf.Ui.Controls.TextBlock
         {
             Text = $"{field.Name} ({CustomFieldTypeDisplay.DisplayNameFor(field.Type)})",
@@ -109,6 +382,10 @@ public partial class CredentialDetailView : UserControl
         };
         caption.SetResourceReference(Control.ForegroundProperty, "Sifra.TextSecondaryBrush");
         panel.Children.Add(caption);
+
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        panel.Children.Add(row);
 
         if (field.Type == CustomFieldType.OneTimePassword)
         {
@@ -118,48 +395,116 @@ public partial class CredentialDetailView : UserControl
                 FontFamily = new System.Windows.Media.FontFamily("Consolas"),
                 FontSize = 18,
                 FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
             };
             otpText.SetResourceReference(Control.ForegroundProperty, "Sifra.TextPrimaryBrush");
-            panel.Children.Add(otpText);
+            Grid.SetColumn(otpText, 0);
+            row.Children.Add(otpText);
             UpdateOtpText(otpText, field.Value);
+            AddButtonColumn(row, "Copy24", "Copy code", () => CopyToClipboard(field.Value));
+            return panel;
         }
-        else
+
+        if (field.Type == CustomFieldType.Website && Uri.TryCreate(field.Value, UriKind.Absolute, out _))
         {
-            var isSensitive = field.Type is CustomFieldType.Password or CustomFieldType.Pin or CustomFieldType.Secret;
-            var valueText = new Wpf.Ui.Controls.TextBlock
-            {
-                Text = isSensitive ? new string('•', 8) : field.Value,
-                FontFamily = new System.Windows.Media.FontFamily("Consolas"),
-            };
-            valueText.SetResourceReference(Control.ForegroundProperty, "Sifra.TextPrimaryBrush");
+            var link = new Wpf.Ui.Controls.HyperlinkButton { Content = field.Value, VerticalAlignment = VerticalAlignment.Center };
+            link.Click += (_, _) => OpenUrl(field.Value);
+            Grid.SetColumn(link, 0);
+            row.Children.Add(link);
+            AddButtonColumn(row, "Copy24", "Copy website", () => CopyToClipboard(field.Value));
+            return panel;
+        }
 
-            if (isSensitive)
-            {
-                var revealed = false;
-                valueText.MouseLeftButtonUp += (_, _) =>
-                {
-                    revealed = !revealed;
-                    valueText.Text = revealed ? field.Value : new string('•', 8);
-                };
-                valueText.Cursor = System.Windows.Input.Cursors.Hand;
-                valueText.ToolTip = "Click to show/hide";
-            }
+        var isSensitive = field.Type is CustomFieldType.Password or CustomFieldType.Pin or CustomFieldType.Secret;
+        var valueText = new Wpf.Ui.Controls.TextBlock
+        {
+            Text = isSensitive ? new string('•', 8) : field.Value,
+            FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        valueText.SetResourceReference(Control.ForegroundProperty, "Sifra.TextPrimaryBrush");
+        Grid.SetColumn(valueText, 0);
+        row.Children.Add(valueText);
 
-            panel.Children.Add(valueText);
+        if (isSensitive)
+        {
+            var revealed = false;
+            valueText.Text = new string('•', 8);
+            AddButtonColumn(row, "Eye24", "Show/hide", () =>
+            {
+                revealed = !revealed;
+                valueText.Text = revealed ? field.Value : new string('•', 8);
+            });
+        }
+
+        AddButtonColumn(row, "Copy24", "Copy value", () => CopyToClipboard(field.Value));
+
+        if (field.Type == CustomFieldType.Password)
+        {
+            AddButtonColumn(row, "History24", "View password history", () => ShowPasswordHistory(field.Name));
         }
 
         return panel;
     }
 
+    private void ShowPasswordHistory(string fieldName)
+    {
+        if (_current is null) return;
+
+        var window = new PasswordHistoryWindow(_services, _vaultCredential, _current.Id, fieldName)
+        {
+            Owner = Window.GetWindow(this),
+        };
+        window.ShowDialog();
+    }
+
+    private static void AddButtonColumn(Grid row, string symbolName, string toolTip, Action onClick)
+    {
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var symbol = Enum.Parse<Wpf.Ui.Controls.SymbolRegular>(symbolName);
+        var button = new Wpf.Ui.Controls.Button { Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = symbol }, ToolTip = toolTip };
+        button.Click += (_, _) => onClick();
+        Grid.SetColumn(button, row.ColumnDefinitions.Count - 1);
+        row.Children.Add(button);
+    }
+
+    private void CopyToClipboard(string value)
+    {
+        try
+        {
+            Clipboard.SetText(value);
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        {
+            // Failure path: another process briefly holding the clipboard must not crash the app.
+            MessageBox.Show(Window.GetWindow(this), "Could not copy to the clipboard.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // Failure path: an unreachable/invalid URL must not crash the app.
+            MessageBox.Show(Window.GetWindow(this), "Could not open this URL.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void RefreshOtpFields()
     {
-        if (_current?.CustomFields is null) return;
+        if (_current is null) return;
 
-        foreach (var child in CustomFieldsList.Items)
+        foreach (var child in FieldsList.Items)
         {
             if (child is StackPanel { Tag: CustomFieldView field } panel && field.Type == CustomFieldType.OneTimePassword)
             {
-                if (panel.Children.Count > 1 && panel.Children[1] is Wpf.Ui.Controls.TextBlock otpText)
+                var row = panel.Children.OfType<Grid>().FirstOrDefault();
+                var otpText = row?.Children.OfType<Wpf.Ui.Controls.TextBlock>().FirstOrDefault();
+                if (otpText is not null)
                 {
                     UpdateOtpText(otpText, field.Value);
                 }
@@ -178,56 +523,6 @@ public partial class CredentialDetailView : UserControl
         catch (FormatException)
         {
             textBlock.Text = "Invalid secret";
-        }
-    }
-
-    private void RenderPassword()
-    {
-        if (_current is null) return;
-        PasswordText.Text = _passwordRevealed ? _current.Password : new string('•', 10);
-    }
-
-    private void RenderPin()
-    {
-        if (_current is null) return;
-        PinText.Text = _pinRevealed ? _current.Pin : new string('•', 4);
-    }
-
-    private void OnRevealPasswordClick(object sender, RoutedEventArgs e)
-    {
-        _passwordRevealed = !_passwordRevealed;
-        RenderPassword();
-    }
-
-    private void OnRevealPinClick(object sender, RoutedEventArgs e)
-    {
-        _pinRevealed = !_pinRevealed;
-        RenderPin();
-    }
-
-    private void OnCopyUsernameClick(object sender, RoutedEventArgs e)
-    {
-        if (_current is null) return;
-        _services.Credentials.CopyUsername(_vaultCredential, _current.Id);
-    }
-
-    private void OnCopyPasswordClick(object sender, RoutedEventArgs e)
-    {
-        if (_current is null) return;
-        _services.Credentials.CopyPassword(_vaultCredential, _current.Id);
-    }
-
-    private void OnOpenUrlClick(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrEmpty(_current?.Url)) return;
-        try
-        {
-            Process.Start(new ProcessStartInfo(_current.Url) { UseShellExecute = true });
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            // Failure path: an unreachable/invalid URL must not crash the app.
-            MessageBox.Show(Window.GetWindow(this), "Could not open this URL.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

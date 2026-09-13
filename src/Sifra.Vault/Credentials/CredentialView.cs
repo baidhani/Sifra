@@ -1,23 +1,18 @@
 namespace Sifra.Vault.Credentials;
 
 /// <summary>
-/// Decrypted, read-only view of a credential. Secret fields (Password,
-/// Notes, AccountNumber, Pin, CustomFields) are null/empty in list results
-/// (List/Search) and populated only by GetById — a list dump should not
-/// decrypt and expose every secret at once. Phone/IsFavorite/Labels are
-/// plaintext metadata and are always present, like Label/Url.
+/// Decrypted, read-only view of a credential. Fields are fully decrypted
+/// here (both from List and GetById) — with a dynamic field model there is
+/// no single "safe" field left to expose without decrypting, so list and
+/// detail views carry the same data. Label/IsFavorite/Tags are plaintext
+/// metadata and are always present.
 /// </summary>
 public sealed record CredentialView(
     string Id,
     string Label,
-    string Username,
-    string? Password,
-    string? Url,
+    IReadOnlyList<CustomFieldView> Fields,
     DateTimeOffset UpdatedAtUtc,
-    string? Phone = null,
-    string? Notes = null,
-    string? AccountNumber = null,
-    string? Pin = null,
-    IReadOnlyList<CustomFieldView>? CustomFields = null,
+    DateTimeOffset CreatedAtUtc,
     bool IsFavorite = false,
-    IReadOnlyList<string>? Labels = null);
+    IReadOnlyList<string>? Tags = null,
+    CredentialIcon? Icon = null);
