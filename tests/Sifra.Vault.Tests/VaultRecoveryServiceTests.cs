@@ -75,13 +75,17 @@ public sealed class VaultRecoveryServiceTests : IDisposable
     public void Recover_DoesNotTouchCredentialsJsonAtAll()
     {
         // Same proof as STORY-005, one level deeper: recovery re-wraps a
-        // key, it never re-encrypts credential data.
+        // key, it never re-encrypts credential data. Compares the actual
+        // stored ciphertext rather than raw file bytes — a WAL-mode SQLite
+        // file's physical layout can shift from checkpointing alone even
+        // with no logical row change, which would make a byte-equality
+        // check flaky.
         var (recovery, _, recoveryKey, _) = SetUpVaultWithOneCredential();
-        var before = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
+        var before = new CredentialStore(_dataDirectory).GetAll().Single().Fields.Select(f => f.EncryptedValueBase64).ToList();
 
         recovery.Recover(recoveryKey, NewPassword);
 
-        var after = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
+        var after = new CredentialStore(_dataDirectory).GetAll().Single().Fields.Select(f => f.EncryptedValueBase64).ToList();
         Assert.Equal(before, after);
     }
 

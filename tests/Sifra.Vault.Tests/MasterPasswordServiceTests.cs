@@ -61,13 +61,18 @@ public sealed class MasterPasswordServiceTests : IDisposable
         authenticator.SetCredential(OldPassword);
         var credentialService = CreateCredentialService();
         var id = credentialService.Add(OldPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
-        var ciphertextBefore = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
+        // Compares the actual stored ciphertext (not raw file bytes — a
+        // WAL-mode SQLite file's physical page layout can shift on its own
+        // from checkpointing even when no logical row changes, so a raw
+        // byte-equality check would be flaky). What matters is that the
+        // credential's own ciphertext was never re-encrypted.
+        var ciphertextBefore = new CredentialStore(_dataDirectory).GetAll().Single().Fields.Select(f => f.EncryptedValueBase64).ToList();
 
         var masterPasswordService = new MasterPasswordService(authenticator, CreateEncryption());
         masterPasswordService.ChangePassword(OldPassword, NewPassword);
 
-        var ciphertextAfter = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
-        Assert.Equal(ciphertextBefore, ciphertextAfter); // credentials.json was never rewritten
+        var ciphertextAfter = new CredentialStore(_dataDirectory).GetAll().Single().Fields.Select(f => f.EncryptedValueBase64).ToList();
+        Assert.Equal(ciphertextBefore, ciphertextAfter); // the credential's ciphertext was never re-encrypted
 
         var view = credentialService.GetById(NewPassword, id);
         Assert.Equal("firas", view.Username());

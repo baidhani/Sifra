@@ -87,7 +87,11 @@ public sealed class CredentialServiceTests : IDisposable
         var service = CreateService();
         service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
-        var rawFileContents = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
+        // vault.db is a binary SQLite file (Phase 3), not JSON text — Latin1
+        // maps every byte to one char without throwing, so any embedded
+        // ASCII plaintext still shows up as the same substring for this
+        // "never present at rest" check.
+        var rawFileContents = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(Path.Combine(_dataDirectory, "vault.db")));
 
         Assert.DoesNotContain("firas", rawFileContents);
         Assert.DoesNotContain("hunter2", rawFileContents);

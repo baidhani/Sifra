@@ -140,7 +140,7 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
                 ("Field", "custom-secret-value", CustomFieldType.Text),
             });
 
-        var raw = File.ReadAllText(Path.Combine(_dataDirectory, "credentials.json"));
+        var raw = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(Path.Combine(_dataDirectory, "vault.db")));
 
         Assert.DoesNotContain("super-secret-note-value", raw);
         Assert.DoesNotContain("ACC-77777", raw);
@@ -214,5 +214,46 @@ public sealed class CredentialExtendedFieldsTests : IDisposable
 
         Assert.Single(service.Search(VaultCredential, "555-0100"));
         Assert.Single(service.Search(VaultCredential, "Finance"));
+    }
+
+    [Fact]
+    public void Edit_TouchingOneFieldOnly_LeavesOtherFieldsUpdatedAtUtcUnchanged()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "Bank", new[]
+        {
+            ("Login", "user1", CustomFieldType.Login),
+            ("Phone", "555-0100", CustomFieldType.Phone),
+        });
+        var original = service.GetById(VaultCredential, id);
+        var phoneFieldBefore = original.Fields.Single(f => f.Name == "Phone");
+
+        System.Threading.Thread.Sleep(10); // ensure a real, measurable time gap
+        service.Edit(VaultCredential, id, "Bank", new[]
+        {
+            ("Login", "user1-changed", CustomFieldType.Login),
+            ("Phone", "555-0100", CustomFieldType.Phone), // unchanged
+        });
+
+        var updated = service.GetById(VaultCredential, id);
+        var loginFieldAfter = updated.Fields.Single(f => f.Name == "Login");
+        var phoneFieldAfter = updated.Fields.Single(f => f.Name == "Phone");
+
+        Assert.True(loginFieldAfter.UpdatedAtUtc > phoneFieldBefore.UpdatedAtUtc);
+        Assert.Equal(phoneFieldBefore.UpdatedAtUtc, phoneFieldAfter.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void Add_StampsEveryFieldWithTheSameCreationTime()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "Bank", new[]
+        {
+            ("Login", "user1", CustomFieldType.Login),
+            ("Phone", "555-0100", CustomFieldType.Phone),
+        });
+
+        var view = service.GetById(VaultCredential, id);
+        Assert.All(view.Fields, f => Assert.Equal(view.CreatedAtUtc, f.UpdatedAtUtc));
     }
 }

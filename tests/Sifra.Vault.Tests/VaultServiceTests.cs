@@ -31,7 +31,10 @@ public sealed class VaultServiceTests : IDisposable
         Assert.True(store.Exists());
 
         // Trust: the plaintext recovery key must never be persisted anywhere.
-        var rawFileContents = File.ReadAllText(Path.Combine(_dataDirectory, "vault.json"));
+        // vault.db is a binary SQLite file (Phase 3) — Latin1 maps every
+        // byte to one char without throwing, so an embedded plaintext
+        // substring still shows up the same way for this check.
+        var rawFileContents = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(Path.Combine(_dataDirectory, "vault.db")));
         Assert.DoesNotContain(recoveryKey, rawFileContents, StringComparison.Ordinal);
 
         var record = store.Load();

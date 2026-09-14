@@ -129,13 +129,13 @@ public sealed class DeviceIdentityServiceTests : IDisposable
         // Failure path: "revocation fails to block access" — a storage
         // error must be surfaced loudly, never silently swallowed while
         // pretending the device is now revoked. Simulated by holding an
-        // exclusive lock on devices.json while Save() tries to move a new
-        // version over it (throws UnauthorizedAccessException on Windows).
+        // exclusive lock on vault.db (Phase 3: SQLite-backed) so a second
+        // connection can't open it.
         var service = CreateService();
         var (deviceId, deviceSecret) = service.EnrollDevice("Firas's Laptop");
 
-        var devicesFilePath = Path.Combine(_dataDirectory, "devices.json");
-        using (new FileStream(devicesFilePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        var dbFilePath = Path.Combine(_dataDirectory, "vault.db");
+        using (new FileStream(dbFilePath, FileMode.Open, FileAccess.Read, FileShare.None))
         {
             Assert.Throws<VaultStorageException>(() => service.RevokeDevice(deviceId));
         }

@@ -44,8 +44,12 @@ public sealed class SharedCredentialServiceTests : IDisposable
 
         var shareId = service.CreateShare(VaultCredential, credentialId, "alice", RecipientPassphrase);
 
-        // The registry only ever holds ciphertext for this credential's secrets.
-        var raw = File.ReadAllText(Path.Combine(_dataDirectory, "share-registry.json"));
+        // The registry only ever holds ciphertext for this credential's
+        // secrets. Phase 3: share-registry is now a table inside vault.db
+        // (binary SQLite), alongside every other store — Latin1 maps every
+        // byte to one char without throwing, so any embedded plaintext
+        // still shows up as the same substring for this check.
+        var raw = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(Path.Combine(_dataDirectory, "vault.db")));
         Assert.DoesNotContain("hunter2", raw);
         Assert.DoesNotContain("firas", raw);
 

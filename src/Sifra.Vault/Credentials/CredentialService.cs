@@ -69,7 +69,7 @@ public sealed class CredentialService
         _store.Upsert(new Credential(
             id,
             label,
-            EncryptFields(fields, key),
+            EncryptFields(fields, key, existingFields: null, now),
             now,
             now,
             IsFavorite: isFavorite,
@@ -86,6 +86,7 @@ public sealed class CredentialService
     {
         var existing = FindOrThrow(id);
         var key = _encryption.DeriveKey(vaultCredential);
+        var now = DateTimeOffset.UtcNow;
 
         // Record the outgoing value of any Password-type field whose value
         // is actually changing — before it's overwritten below — so History
@@ -112,8 +113,8 @@ public sealed class CredentialService
         _store.Upsert(new Credential(
             id,
             label,
-            EncryptFields(fields, key),
-            DateTimeOffset.UtcNow,
+            EncryptFields(fields, key, existing.Fields, now),
+            now,
             existing.CreatedAtUtc,
             IsFavorite: isFavorite,
             Tags: tags,
@@ -196,15 +197,41 @@ public sealed class CredentialService
     private CredentialView ToView(Credential record, byte[] key) => new(
         record.Id,
         record.Label,
-        record.Fields.Select(f => new CustomFieldView(f.Name, _encryption.Decrypt(f.EncryptedValueBase64, key), f.Type)).ToList(),
+        record.Fields.Select(f => new CustomFieldView(f.Name, _encryption.Decrypt(f.EncryptedValueBase64, key), f.Type, f.UpdatedAtUtc)).ToList(),
         record.UpdatedAtUtc,
         record.CreatedAtUtc,
         IsFavorite: record.IsFavorite,
         Tags: record.Tags ?? Array.Empty<string>(),
         Icon: record.Icon);
 
-    private List<CustomField> EncryptFields(IReadOnlyList<(string Name, string Value, CustomFieldType Type)> fields, byte[] key) =>
-        fields.Select(f => new CustomField(f.Name, _encryption.Encrypt(f.Value, key), f.Type)).ToList();
+    /// <summary>
+    /// Stamps each field with the current edit time, except a field whose
+    /// plaintext value is unchanged from what's already stored — that one
+    /// keeps its previous UpdatedAtUtc rather than being bumped just
+    /// because the credential as a whole was re-saved (e.g. renaming the
+    /// credential without touching this field). This is the groundwork
+    /// Phase 3's per-field cloud-sync versioning depends on: a field's
+    /// timestamp must reflect when its value actually last changed, not
+    /// merely when some Edit() call happened to touch the credential.
+    /// </summary>
+    private List<CustomField> EncryptFields(
+        IReadOnlyList<(string Name, string Value, CustomFieldType Type)> fields,
+        byte[] key,
+        IReadOnlyList<CustomField>? existingFields,
+        DateTimeOffset now)
+    {
+        return fields.Select(f =>
+        {
+            var existing = existingFields?.FirstOrDefault(e => e.Name == f.Name && e.Type == f.Type);
+            var updatedAt = now;
+            if (existing is not null && _encryption.Decrypt(existing.EncryptedValueBase64, key) == f.Value)
+            {
+                updatedAt = existing.UpdatedAtUtc;
+            }
+
+            return new CustomField(f.Name, _encryption.Encrypt(f.Value, key), f.Type, updatedAt);
+        }).ToList();
+    }
 
     private Credential FindOrThrow(string id) =>
         _store.GetAll().FirstOrDefault(c => c.Id == id) ?? throw new CredentialNotFoundException(id);

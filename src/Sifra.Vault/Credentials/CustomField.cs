@@ -10,7 +10,13 @@ namespace Sifra.Vault.Credentials;
 /// how the UI displays/masks/formats it, and for OneTimePassword, what the
 /// stored value actually means (a TOTP secret, not a code).
 /// </summary>
-public sealed record CustomField(string Name, string EncryptedValueBase64, CustomFieldType Type = CustomFieldType.Text);
+/// <param name="UpdatedAtUtc">
+/// When this specific field's value last changed — not the credential's
+/// overall UpdatedAtUtc. Groundwork for per-field last-write-wins cloud
+/// sync (Phase 3): defaults to epoch-like "unset" only for records built
+/// before this existed; real writers always supply the actual edit time.
+/// </param>
+public sealed record CustomField(string Name, string EncryptedValueBase64, CustomFieldType Type = CustomFieldType.Text, DateTimeOffset UpdatedAtUtc = default);
 
 /// <summary>Decrypted view of a CustomField.</summary>
-public sealed record CustomFieldView(string Name, string Value, CustomFieldType Type = CustomFieldType.Text);
+public sealed record CustomFieldView(string Name, string Value, CustomFieldType Type = CustomFieldType.Text, DateTimeOffset UpdatedAtUtc = default);

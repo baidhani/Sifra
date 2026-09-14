@@ -147,22 +147,21 @@ public sealed class VaultSessionTests : IDisposable
         var credentialService = CreateCredentialService();
         var id = credentialService.Add(MasterPassword, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
-        // Flip one character of the first field's encrypted value on the
-        // deserialized object, not the raw JSON text — System.Text.Json
-        // escapes some base64 characters (e.g. '+' as "+"), so
-        // editing raw text could corrupt the JSON escape sequence itself
-        // instead of the ciphertext, producing an inconsistent failure.
-        var filePath = Path.Combine(_dataDirectory, "credentials.json");
-        var records = System.Text.Json.JsonSerializer.Deserialize<List<Sifra.Vault.Credentials.Credential>>(File.ReadAllText(filePath))!;
-        var record = records[0];
+        // Flip one character of the first field's encrypted value via the
+        // store's own object model (read, mutate, Upsert) rather than
+        // poking at vault.db directly — this is Phase 3's SQLite store, so
+        // there's no JSON text/escaping concern any more; going through
+        // CredentialStore.Upsert is simply the correct way to write back a
+        // tampered field value.
+        var store = new CredentialStore(_dataDirectory);
+        var record = store.GetAll()[0];
         var passwordField = record.Fields.First(f => f.Type == CustomFieldType.Password);
         var chars = passwordField.EncryptedValueBase64.ToCharArray();
         chars[0] = chars[0] == 'A' ? 'B' : 'A';
         var tamperedFields = record.Fields
             .Select(f => f == passwordField ? f with { EncryptedValueBase64 = new string(chars) } : f)
             .ToList();
-        records[0] = record with { Fields = tamperedFields };
-        File.WriteAllText(filePath, System.Text.Json.JsonSerializer.Serialize(records));
+        store.Upsert(record with { Fields = tamperedFields });
 
         var session = new VaultSession(authenticator);
         session.Unlock(MasterPassword);
@@ -182,9 +181,29 @@ public sealed class VaultSessionTests : IDisposable
         authenticator.SetCredential(MasterPassword);
         var session = new VaultSession(authenticator);
 
-        var vaultAccessFilePath = Path.Combine(_dataDirectory, "vault-access-credential.json");
-        var originalContents = File.ReadAllText(vaultAccessFilePath);
-        File.WriteAllText(vaultAccessFilePath, "{ not valid json");
+        // Phase 3: vault_access_credential is a row in vault.db, not a
+        // standalone JSON file — corrupt/restore that row's JSON text
+        // directly via SQL instead of rewriting a file.
+        var dbPath = Path.Combine(_dataDirectory, "vault.db");
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath};Pooling=False");
+        connection.Open();
+
+        string originalJson;
+        using (var readCmd = connection.CreateCommand())
+        {
+            readCmd.CommandText = "SELECT json_value FROM vault_access_credential WHERE id = 1";
+            originalJson = (string)readCmd.ExecuteScalar()!;
+        }
+
+        void SetJson(string json)
+        {
+            using var updateCmd = connection.CreateCommand();
+            updateCmd.CommandText = "UPDATE vault_access_credential SET json_value = $json WHERE id = 1";
+            updateCmd.Parameters.AddWithValue("$json", json);
+            updateCmd.ExecuteNonQuery();
+        }
+
+        SetJson("{ not valid json");
 
         try
         {
@@ -194,7 +213,7 @@ public sealed class VaultSessionTests : IDisposable
         }
         finally
         {
-            File.WriteAllText(vaultAccessFilePath, originalContents);
+            SetJson(originalJson);
         }
     }
 }
