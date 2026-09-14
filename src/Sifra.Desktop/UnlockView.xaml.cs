@@ -11,10 +11,23 @@ public partial class UnlockView : UserControl
     /// <summary>Raised with the now-proven-correct vault credential once unlock succeeds.</summary>
     public event EventHandler<string>? Unlocked;
 
+    /// <summary>Raised when the user clicks Deny on the pending-pairing-request notice, without ever unlocking.</summary>
+    public event EventHandler? DenyPairingRequested;
+
     public UnlockView(AppServices services)
     {
         InitializeComponent();
         _services = services;
+    }
+
+    public void SetPairingNoticeVisible(bool visible)
+    {
+        PairingNoticeBorder.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnDenyPairingClick(object sender, RoutedEventArgs e)
+    {
+        DenyPairingRequested?.Invoke(this, EventArgs.Empty);
     }
 
     private void OnUnlockClick(object sender, RoutedEventArgs e) => TryUnlock();

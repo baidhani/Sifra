@@ -1,9 +1,12 @@
+using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using Sifra.Vault.Audit;
 using Sifra.Vault.Autofill;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Devices;
+using Sifra.Vault.Pairing;
 
 // Chrome's native messaging host: reads/writes messages on stdin/stdout,
 // each framed as a 4-byte little-endian length prefix followed by that
@@ -20,12 +23,15 @@ var auditLogger = new AuditLogger(
     new FileAuditLogSink(Path.Combine(resolvedDataDirectory, "operations.log")),
     new LocalFakeAdminAlertSink());
 
+var encryptionService = new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory));
 var autofillService = new CredentialAutofillService(
     new CredentialService(
         new CredentialStore(dataDirectory),
-        new VaultEncryptionService(new VaultMasterKeyStore(dataDirectory)),
+        encryptionService,
         new TextCopyCredentialClipboard()),
     auditLogger);
+
+var deviceIdentityService = new DeviceIdentityService(new DeviceRegistryStore(dataDirectory), auditLogger);
 
 using var stdin = Console.OpenStandardInput();
 using var stdout = Console.OpenStandardOutput();
@@ -45,7 +51,7 @@ while (true)
         break;
     }
 
-    var responseJson = HandleRequest(Encoding.UTF8.GetString(messageBytes), autofillService);
+    var responseJson = HandleRequest(Encoding.UTF8.GetString(messageBytes), autofillService, deviceIdentityService, encryptionService);
     var responseBytes = Encoding.UTF8.GetBytes(responseJson);
     stdout.Write(BitConverter.GetBytes(responseBytes.Length), 0, 4);
     stdout.Write(responseBytes, 0, responseBytes.Length);
@@ -74,14 +80,73 @@ static byte[]? ReadExactly(Stream stream, int count)
     return buffer;
 }
 
-static string HandleRequest(string requestJson, CredentialAutofillService autofillService)
+static string HandleRequest(
+    string requestJson, CredentialAutofillService autofillService, DeviceIdentityService deviceIdentityService, VaultEncryptionService encryptionService)
 {
     try
     {
         using var doc = JsonDocument.Parse(requestJson);
         var root = doc.RootElement;
         var action = root.GetProperty("action").GetString();
+
+        // "pair" has no device identity yet by definition — it's the
+        // action that creates one — so it's handled before the
+        // device-verification gate below, not after it.
+        if (action == "pair")
+        {
+            var browserName = root.TryGetProperty("browserName", out var bn) ? bn.GetString() ?? "Browser extension" : "Browser extension";
+            return PerformPairingAsync(browserName).GetAwaiter().GetResult();
+        }
+
+        // Every other action requires a device already paired via the
+        // named-pipe approval flow above — see Sifra.Desktop's
+        // ExtensionPairingServer. This is what makes the extension a
+        // real, individually-revocable device (Phase 2) rather than any
+        // copy of it having implicit access purely because Chrome's
+        // native-messaging registry entry exists.
+        var deviceId = root.GetProperty("deviceId").GetString()!;
+        var deviceSecret = root.GetProperty("deviceSecret").GetString()!;
+        deviceIdentityService.VerifyDeviceAccess(deviceId, deviceSecret);
+
         var vaultCredential = root.GetProperty("vaultCredential").GetString()!;
+
+        // "verify" only checks the password is correct — it never returns
+        // any credential data. DeriveKey throws VaultDecryptionFailedException
+        // if the password can't unwrap the vault's master key, which is
+        // exactly what "wrong password" means here. Added because the
+        // extension's own UNLOCK previously cached whatever was typed
+        // without ever checking it against the real vault.
+        if (action == "verify")
+        {
+            try
+            {
+                encryptionService.DeriveKey(vaultCredential);
+            }
+            catch (Sifra.Vault.Crypto.VaultDecryptionFailedException)
+            {
+                // 5 wrong passwords through this device auto-revokes it — a
+                // leaked device secret alone must not be enough for
+                // unlimited offline password guesses. Report it as the same
+                // DeviceRevokedException the extension already treats as
+                // "needs pairing again" (see DEVICE_INVALID_ERRORS in
+                // background.js) rather than a plain wrong-password error.
+                var wasRevoked = deviceIdentityService.RecordFailedPasswordAttempt(deviceId);
+                if (wasRevoked)
+                {
+                    return JsonSerializer.Serialize(new
+                    {
+                        ok = false,
+                        error = "DeviceRevokedException",
+                        message = "Too many failed password attempts — this browser has been unpaired. Pair again.",
+                    });
+                }
+                throw;
+            }
+
+            deviceIdentityService.ResetFailedPasswordAttempts(deviceId);
+            return JsonSerializer.Serialize(new { ok = true });
+        }
+
         var url = root.GetProperty("url").GetString()!;
 
         switch (action)
@@ -106,7 +171,55 @@ static string HandleRequest(string requestJson, CredentialAutofillService autofi
         // Never crash the host on a bad/failed request — report the error
         // back to the extension instead. The exception type name lets the
         // extension distinguish "wrong consent" from "wrong domain" from
-        // "wrong vault password" without parsing message text.
+        // "wrong vault password" from "device not paired/revoked" without
+        // parsing message text.
         return JsonSerializer.Serialize(new { ok = false, error = ex.GetType().Name, message = ex.Message });
+    }
+}
+
+// Connects to Sifra.Desktop's pairing pipe (see ExtensionPairingServer) and
+// relays the human's approve/deny decision back to the extension. A short
+// connect timeout means "Desktop isn't running" is reported almost
+// instantly rather than making the extension wait out the full pairing
+// timeout to find out nobody could possibly answer.
+static async Task<string> PerformPairingAsync(string browserName)
+{
+    try
+    {
+        using var client = new NamedPipeClientStream(".", "SifraExtensionPairing", PipeDirection.InOut, PipeOptions.Asynchronous);
+        using var connectCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        try
+        {
+            await client.ConnectAsync(connectCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = "DesktopNotRunning", message = "Open Sifra Desktop to approve pairing." });
+        }
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        var request = JsonSerializer.SerializeToUtf8Bytes(new { browserName });
+        await PipeFraming.WriteFrameAsync(client, request, timeoutCts.Token);
+
+        var responseBytes = await PipeFraming.ReadFrameAsync(client, timeoutCts.Token);
+        if (responseBytes is null)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = "PairingFailed", message = "Sifra Desktop closed the connection." });
+        }
+
+        using var responseDoc = JsonDocument.Parse(responseBytes);
+        var approved = responseDoc.RootElement.GetProperty("approved").GetBoolean();
+        if (!approved)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = "PairingDenied", message = "Pairing was declined in Sifra Desktop." });
+        }
+
+        var deviceId = responseDoc.RootElement.GetProperty("deviceId").GetString();
+        var deviceSecret = responseDoc.RootElement.GetProperty("deviceSecret").GetString();
+        return JsonSerializer.Serialize(new { ok = true, deviceId, deviceSecret });
+    }
+    catch (OperationCanceledException)
+    {
+        return JsonSerializer.Serialize(new { ok = false, error = "PairingTimedOut", message = "No response from Sifra Desktop." });
     }
 }

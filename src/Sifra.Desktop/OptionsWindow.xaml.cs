@@ -5,7 +5,7 @@ using Wpf.Ui.Controls;
 
 namespace Sifra.Desktop;
 
-/// <summary>App-wide preferences. Currently just auto-lock timeout; more settings can join this same dialog later.</summary>
+/// <summary>App-wide preferences: auto-lock timeout, and an entry point to the Manage Extensions window.</summary>
 public partial class OptionsWindow : FluentWindow
 {
     // (minutes|null for "Never", display label)
@@ -35,6 +35,12 @@ public partial class OptionsWindow : FluentWindow
 
         var selectedIndex = Array.FindIndex(AutoLockOptions, o => o.Minutes == current.AutoLockMinutes);
         AutoLockCombo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 1; // default to 5 minutes if unrecognized
+    }
+
+    private void OnManageExtensionsClick(object sender, RoutedEventArgs e)
+    {
+        var window = new ManageExtensionsWindow(_services) { Owner = this };
+        window.ShowDialog();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)

@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
-        <ui:Card x:Name="IntroPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32">
+        <ui:Card x:Name="IntroPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Create your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
@@ -22,7 +22,7 @@
         </ui:Card>
 
         <ui:Card x:Name="RecoveryPanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                 VerticalContentAlignment="Top" Padding="32">
+                 VerticalContentAlignment="Top" Padding="32" BorderThickness="0">
             <StackPanel HorizontalAlignment="Center" Margin="0,24,0,0" Width="396">
                 <Image Source="Assets/Brand/sifra_vault_created.png" Width="128" Height="128" Margin="0,0,0,20" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Vault created" FontTypography="Subtitle" Foreground="{DynamicResource SystemFillColorSuccessBrush}" Margin="0,0,0,8"/>

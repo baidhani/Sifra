@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="Options" Height="260" Width="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Title="Options" Height="300" Width="460" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
         Background="{DynamicResource Sifra.WindowBrush}">
     <Grid Background="{DynamicResource Sifra.WindowBrush}">
@@ -18,12 +18,19 @@
         <ui:TitleBar Grid.Row="0" Title="Options" Background="{DynamicResource Sifra.WindowBrush}"
                      ShowMaximize="False" ShowMinimize="False"/>
 
-        <StackPanel Grid.Row="1" Margin="20">
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
             <ui:TextBlock Text="Auto-lock" FontTypography="BodyStrong" Margin="0,0,0,6"/>
             <ui:TextBlock Text="Lock the vault automatically after this much inactivity."
                           FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
-            <ComboBox x:Name="AutoLockCombo" HorizontalAlignment="Left" Width="200"/>
+            <ComboBox x:Name="AutoLockCombo" HorizontalAlignment="Left" Width="200" Margin="0,0,0,20"/>
+
+            <ui:TextBlock Text="Browser extensions" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+            <ui:TextBlock Text="Manage which browsers can access this vault through the Sifra extension."
+                          FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <ui:Button Content="Manage Extensions..." HorizontalAlignment="Left" Click="OnManageExtensionsClick"/>
         </StackPanel>
+        </ScrollViewer>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">
             <ui:Button Content="Save" Appearance="Primary" Margin="0,0,10,0" Click="OnSaveClick"/>

@@ -11,7 +11,11 @@
   </style>
 </head>
 <body>
-  <div id="lockedView">
+  <div id="unpairedView">
+    <p>Connect this browser to Sifra Desktop to enable autofill.</p>
+    <button id="pairButton">Pair with Desktop</button>
+  </div>
+  <div id="lockedView" hidden>
     <label for="password">Vault master password</label>
     <input type="password" id="password" autocomplete="off" />
     <button id="unlockButton">Unlock for this session</button>

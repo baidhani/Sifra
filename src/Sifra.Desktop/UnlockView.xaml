@@ -7,7 +7,7 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
-        <ui:Card HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32">
+        <ui:Card HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Unlock your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,20"/>
@@ -20,6 +20,25 @@
                 <ui:Button x:Name="UnlockButton" AutomationProperties.AutomationId="UnlockButton"
                            Content="Unlock" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnUnlockClick"/>
                 <ui:TextBlock x:Name="ErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+
+                <!-- Shown while a browser extension's pairing request is
+                     waiting on this vault being unlocked (Phase 2) — the
+                     approval prompt itself only appears after unlock, so
+                     without this the user would have no idea anything was
+                     pending. Disappears if the request is approved/denied
+                     after unlock, or if it times out first. -->
+                <Border x:Name="PairingNoticeBorder" Visibility="Collapsed" Margin="0,16,0,0" Padding="12"
+                        CornerRadius="6" Background="{DynamicResource Sifra.SurfaceElevatedBrush}">
+                    <StackPanel>
+                        <ui:TextBlock Text="A browser extension is requesting access. Unlock the vault to approve it, or deny it below."
+                                      TextWrapping="Wrap" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10"/>
+                        <!-- Deny needs no master password — refusing access
+                             is the safe default and has no sensitivity the
+                             way approving a new device does, so there is no
+                             reason to force an unlock just to say no. -->
+                        <ui:Button x:Name="DenyPairingButton" Content="Deny" HorizontalAlignment="Left" Click="OnDenyPairingClick"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </ui:Card>
     </Grid>

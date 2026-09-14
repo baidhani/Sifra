@@ -176,4 +176,90 @@ public sealed class DeviceIdentityServiceTests : IDisposable
         Assert.Contains(lines, l => l.Contains("RevokeDevice"));
         Assert.Contains(lines, l => l.Contains("ReEnrollDevice"));
     }
+
+    [Fact]
+    public void ListDevices_ReturnsEnrolledDevicesNewestFirst()
+    {
+        var service = CreateService();
+        var (firstId, _) = service.EnrollDevice("First Device");
+        var (secondId, _) = service.EnrollDevice("Second Device");
+
+        var devices = service.ListDevices();
+
+        Assert.Equal(2, devices.Count);
+        Assert.Equal(secondId, devices[0].DeviceId);
+        Assert.Equal(firstId, devices[1].DeviceId);
+    }
+
+    [Fact]
+    public void ListDevices_ReflectsRevocation()
+    {
+        var service = CreateService();
+        var (deviceId, _) = service.EnrollDevice("Firas's Laptop");
+
+        service.RevokeDevice(deviceId);
+
+        var device = Assert.Single(service.ListDevices());
+        Assert.NotNull(device.RevokedAtUtc);
+    }
+
+    [Fact]
+    public void RecordFailedPasswordAttempt_BelowThreshold_DoesNotRevoke()
+    {
+        var service = CreateService();
+        var (deviceId, _) = service.EnrollDevice("Firas's Laptop");
+
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.False(service.RecordFailedPasswordAttempt(deviceId));
+        }
+
+        Assert.Null(service.ListDevices().Single().RevokedAtUtc);
+    }
+
+    [Fact]
+    public void RecordFailedPasswordAttempt_AtThreshold_AutoRevokesTheDevice()
+    {
+        var service = CreateService();
+        var (deviceId, deviceSecret) = service.EnrollDevice("Firas's Laptop");
+
+        var wasRevoked = false;
+        for (var i = 0; i < 5; i++)
+        {
+            wasRevoked = service.RecordFailedPasswordAttempt(deviceId);
+        }
+
+        Assert.True(wasRevoked);
+        Assert.Throws<DeviceRevokedException>(() => service.VerifyDeviceAccess(deviceId, deviceSecret));
+    }
+
+    [Fact]
+    public void RecordFailedPasswordAttempt_ForANonExistentDevice_ThrowsDeviceNotEnrolled()
+    {
+        var service = CreateService();
+
+        Assert.Throws<DeviceNotEnrolledException>(() => service.RecordFailedPasswordAttempt("does-not-exist"));
+    }
+
+    [Fact]
+    public void ResetFailedPasswordAttempts_ThenMoreFailures_TakesFullThresholdAgainToRevoke()
+    {
+        var service = CreateService();
+        var (deviceId, deviceSecret) = service.EnrollDevice("Firas's Laptop");
+
+        for (var i = 0; i < 4; i++)
+        {
+            service.RecordFailedPasswordAttempt(deviceId);
+        }
+        service.ResetFailedPasswordAttempts(deviceId);
+
+        // A correct password reset the counter, so 4 more failures alone
+        // must not revoke — it takes another full threshold from here.
+        for (var i = 0; i < 4; i++)
+        {
+            Assert.False(service.RecordFailedPasswordAttempt(deviceId));
+        }
+        // Does not throw — still active.
+        service.VerifyDeviceAccess(deviceId, deviceSecret);
+    }
 }

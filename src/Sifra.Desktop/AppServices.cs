@@ -6,6 +6,7 @@ using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Devices;
 using Sifra.Vault.Health;
 using Sifra.Vault.Session;
 using Sifra.Vault.Settings;
@@ -32,6 +33,7 @@ public sealed class AppServices
     public PasswordHealthService PasswordHealth { get; }
     public IBreachChecker BreachChecker { get; } = new HibpBreachChecker(new HttpClient());
     public AppSettingsStore Settings { get; } = new(null);
+    public DeviceIdentityService Devices { get; }
 
     public AppServices()
     {
@@ -61,5 +63,6 @@ public sealed class AppServices
             Credentials, new CredentialIconImageStore(null), new GoogleFaviconFetcher(new HttpClient()));
         Tags = new TagService(new TagStore(null));
         PasswordHealth = new PasswordHealthService(Credentials, auditLogger);
+        Devices = new DeviceIdentityService(new DeviceRegistryStore(null), auditLogger);
     }
 }

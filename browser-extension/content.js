@@ -12,7 +12,8 @@
   chrome.runtime.sendMessage({ type: "DISCOVER", url: location.href }, (response) => {
     if (!response || !response.ok) {
       if (response?.needsUnlock) showUnlockPrompt();
-      return; // no match, needs-unlock, or a native host error — nothing to fill
+      else if (response?.needsPairing) showPairingPrompt();
+      return; // no match, needs-unlock, needs-pairing, or a native host error — nothing to fill
     }
     if (response.credentials.length > 0) showConsentBanner(response.credentials);
   });
@@ -24,11 +25,19 @@
   }
 
   function showUnlockPrompt() {
+    showToast("Sifra: unlock the extension (toolbar icon) to enable autofill on this page.");
+  }
+
+  function showPairingPrompt() {
+    showToast("Sifra: pair this browser with Sifra Desktop (toolbar icon) to enable autofill.");
+  }
+
+  function showToast(text) {
     const banner = document.createElement("div");
     banner.style.cssText =
       "position:fixed;top:12px;right:12px;z-index:2147483647;background:#374151;color:#fff;" +
       "font:14px system-ui,sans-serif;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);";
-    banner.textContent = "Sifra: unlock the extension (toolbar icon) to enable autofill on this page.";
+    banner.textContent = text;
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 6000);
   }

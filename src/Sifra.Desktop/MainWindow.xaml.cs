@@ -15,7 +15,83 @@ public partial class MainWindow : FluentWindow
 
     private readonly AppServices _services = new();
     private readonly IdleLockMonitor _idleLockMonitor = new();
+    private readonly ExtensionPairingServer _pairingServer;
+    private bool _isUnlocked;
     private bool _resizeLocked;
+
+    // Raised each time the vault transitions from locked to unlocked —
+    // ExtensionPairingServer waits on this (via WaitForUnlockAsync) before
+    // ever showing a pairing-approval prompt, so approving a new device
+    // always requires proving the master password first, not just
+    // physical access to a locked, unattended window.
+    public event EventHandler? Unlocked;
+
+    // Tracks whether at least one pairing request is currently waiting on
+    // the vault being unlocked, so the Unlock screen can show a notice
+    // instead of leaving the user with no idea anything is pending. A
+    // count, not a bool, in case more than one request is ever in flight
+    // at once — the notice stays up until every one of them has resolved.
+    private int _pendingPairingRequests;
+    private EventHandler<bool>? _currentUnlockViewPairingHandler;
+    public event EventHandler<bool>? PairingRequestStateChanged;
+    public bool HasPendingPairingRequest => _pendingPairingRequests > 0;
+
+    // Called by ExtensionPairingServer (from a background thread) right
+    // before and after it awaits WaitForUnlockAsync for one request.
+    public void NotifyPairingRequestStarted()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _pendingPairingRequests++;
+            if (_pendingPairingRequests == 1)
+            {
+                PairingRequestStateChanged?.Invoke(this, true);
+            }
+        });
+    }
+
+    public void NotifyPairingRequestEnded()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _pendingPairingRequests = Math.Max(0, _pendingPairingRequests - 1);
+            if (_pendingPairingRequests == 0)
+            {
+                PairingRequestStateChanged?.Invoke(this, false);
+            }
+        });
+    }
+
+    // Raised when the user clicks Deny on the Unlock screen's pairing
+    // notice (see UnlockView.DenyPairingRequested, wired in ShowUnlock).
+    // Deny needs no proof of the master password — refusing access is the
+    // safe default, unlike Approve, which is gated behind WaitForUnlockAsync.
+    private event EventHandler? PairingDeniedFromLockScreen;
+
+    /// <summary>
+    /// Resolves the moment the user clicks Deny on the lock screen's
+    /// pairing notice, or is abandoned (its subscription cleaned up) once
+    /// cancellationToken fires — letting ExtensionPairingServer race this
+    /// against WaitForUnlockAsync without ever needing the vault unlocked
+    /// just to say no.
+    /// </summary>
+    public Task WaitForLockScreenDenyAsync(CancellationToken cancellationToken)
+    {
+        var tcs = new TaskCompletionSource();
+        EventHandler? handler = null;
+        handler = (_, _) =>
+        {
+            PairingDeniedFromLockScreen -= handler;
+            tcs.TrySetResult();
+        };
+        PairingDeniedFromLockScreen += handler;
+        cancellationToken.Register(() =>
+        {
+            PairingDeniedFromLockScreen -= handler;
+            tcs.TrySetCanceled(cancellationToken);
+        });
+        return tcs.Task;
+    }
     private IntPtr _originalWndProc;
     // Kept as a field, not a local — native code holds a raw pointer to this
     // delegate, so it must not become eligible for GC while installed.
@@ -35,6 +111,64 @@ public partial class MainWindow : FluentWindow
         PreviewMouseDown += (_, _) => _idleLockMonitor.NotifyActivity();
         PreviewKeyDown += (_, _) => _idleLockMonitor.NotifyActivity();
         _idleLockMonitor.TimedOut += (_, _) => ShowUnlock();
+
+        // Runs for the app's whole lifetime — enrolling a device itself
+        // only touches device-registry metadata, not encrypted data, but
+        // ExtensionPairingServer still waits for WaitForUnlockAsync before
+        // showing the approval prompt (see that class and Unlocked above)
+        // so approving requires proving the master password.
+        _pairingServer = new ExtensionPairingServer(_services, this);
+        Closed += (_, _) => _pairingServer.Dispose();
+    }
+
+    /// <summary>
+    /// Resolves once the vault is next unlocked — immediately if it
+    /// already is. Brings the window to the foreground so a locked,
+    /// unattended app doesn't leave a pairing request silently waiting
+    /// behind other windows.
+    /// </summary>
+    public Task WaitForUnlockAsync()
+    {
+        // Called from ExtensionPairingServer's background pipe-listener
+        // thread — every operation here (reading _isUnlocked, touching the
+        // Unlocked event, and especially Activate(), which is a real WPF
+        // Window method with UI-thread affinity) must run on the
+        // dispatcher thread instead, or WPF throws "the calling thread
+        // cannot access this object because a different thread owns it."
+        return Dispatcher.Invoke(() =>
+        {
+            if (_isUnlocked)
+            {
+                BringToForeground();
+                return Task.CompletedTask;
+            }
+
+            var tcs = new TaskCompletionSource();
+            EventHandler? handler = null;
+            handler = (_, _) =>
+            {
+                Unlocked -= handler;
+                tcs.SetResult();
+            };
+            Unlocked += handler;
+
+            BringToForeground();
+            return tcs.Task;
+        });
+    }
+
+    // Activate() alone does not restore a minimized window in WPF — it can
+    // activate/focus the window while it stays minimized, so a pairing
+    // request arriving while the app is minimized would silently fail to
+    // ever become visible. WindowState must be reset first.
+    private void BringToForeground()
+    {
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -120,11 +254,30 @@ public partial class MainWindow : FluentWindow
         // way, no vault is unlocked any more, so nothing should keep ticking
         // toward a second auto-lock.
         _idleLockMonitor.Stop();
+        _isUnlocked = false;
         SetCompactWindowSize();
         RootGrid.Children.Clear();
         var unlockView = new UnlockView(_services);
+
+        // Exactly one of these is ever wired at a time — unsubscribing the
+        // previous one here (rather than only where the view gets replaced)
+        // means every path that can call ShowUnlock again (idle timeout,
+        // explicit Lock, LockRequested) can't accumulate stale handlers
+        // pointing at a discarded UnlockView instance.
+        if (_currentUnlockViewPairingHandler is not null)
+        {
+            PairingRequestStateChanged -= _currentUnlockViewPairingHandler;
+        }
+        unlockView.SetPairingNoticeVisible(HasPendingPairingRequest);
+        _currentUnlockViewPairingHandler = (_, hasPending) => unlockView.SetPairingNoticeVisible(hasPending);
+        PairingRequestStateChanged += _currentUnlockViewPairingHandler;
+        unlockView.DenyPairingRequested += (_, _) => PairingDeniedFromLockScreen?.Invoke(this, EventArgs.Empty);
+
         unlockView.Unlocked += (_, vaultCredential) =>
         {
+            _isUnlocked = true;
+            PairingRequestStateChanged -= _currentUnlockViewPairingHandler;
+            _currentUnlockViewPairingHandler = null;
             RootGrid.Children.Clear();
             SetShellWindowSize();
             var shellView = new ShellView(_services, vaultCredential);
@@ -132,6 +285,7 @@ public partial class MainWindow : FluentWindow
             shellView.SettingsChanged += (_, _) => StartIdleLockMonitor();
             RootGrid.Children.Add(shellView);
             StartIdleLockMonitor();
+            Unlocked?.Invoke(this, EventArgs.Empty);
         };
         RootGrid.Children.Add(unlockView);
     }

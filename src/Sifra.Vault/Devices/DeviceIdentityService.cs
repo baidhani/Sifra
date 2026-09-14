@@ -17,6 +17,16 @@ public sealed class DeviceIdentityService
     private const int HashLengthBytes = 32;
     private const int Pbkdf2Iterations = 210_000; // OWASP current minimum for PBKDF2-SHA256
 
+    // A device's secret proves it's the browser that was paired, but says
+    // nothing about whether whoever is sitting at that browser actually
+    // knows the vault's master password. Without a limit, a stolen/leaked
+    // device secret would let an attacker brute-force the master password
+    // offline through this device indefinitely. Auto-revoking (rather than
+    // a timed cooldown) matches the explicit choice made when this was
+    // discussed: too many wrong passwords should force re-pairing, not
+    // just a wait.
+    private const int MaxFailedPasswordAttempts = 5;
+
     private readonly DeviceRegistryStore _store;
     private readonly AuditLogger? _auditLogger;
 
@@ -25,6 +35,52 @@ public sealed class DeviceIdentityService
         _store = store;
         _auditLogger = auditLogger;
     }
+
+    /// <summary>
+    /// Records a wrong vault-password attempt made through this device
+    /// (distinct from VerifyDeviceAccess, which checks the device's own
+    /// secret — this tracks whether whoever holds that secret actually
+    /// knows the master password). Auto-revokes the device once
+    /// MaxFailedPasswordAttempts is reached.
+    /// </summary>
+    /// <returns>True if this call caused (or the device already had) an auto-revocation.</returns>
+    /// <exception cref="DeviceNotEnrolledException">This device id has never been enrolled.</exception>
+    public bool RecordFailedPasswordAttempt(string deviceId)
+    {
+        var record = _store.Load(deviceId) ?? throw new DeviceNotEnrolledException(deviceId);
+        if (record.RevokedAtUtc is not null)
+        {
+            return true;
+        }
+
+        var attempts = record.FailedPasswordAttempts + 1;
+        var revokedNow = attempts >= MaxFailedPasswordAttempts;
+
+        _store.Save(record with
+        {
+            FailedPasswordAttempts = attempts,
+            RevokedAtUtc = revokedNow ? DateTimeOffset.UtcNow : null,
+        });
+
+        _auditLogger?.Log(nameof(RecordFailedPasswordAttempt), Environment.UserName,
+            details: $"deviceId={deviceId} attempts={attempts} autoRevoked={revokedNow}");
+
+        return revokedNow;
+    }
+
+    /// <summary>Clears a device's failed-password counter after a correct password. No-op for an unenrolled device id.</summary>
+    public void ResetFailedPasswordAttempts(string deviceId)
+    {
+        var record = _store.Load(deviceId);
+        if (record is not null && record.FailedPasswordAttempts != 0)
+        {
+            _store.Save(record with { FailedPasswordAttempts = 0 });
+        }
+    }
+
+    /// <summary>All enrolled devices (active and revoked), newest first — for a device-management UI. Never includes a secret.</summary>
+    public IReadOnlyList<DeviceRecord> ListDevices() =>
+        _store.LoadAll().Values.OrderByDescending(d => d.EnrolledAtUtc).ToList();
 
     /// <returns>(deviceId, deviceSecret) — the secret is returned only this once and never persisted in plaintext.</returns>
     public (string DeviceId, string DeviceSecret) EnrollDevice(string deviceName)

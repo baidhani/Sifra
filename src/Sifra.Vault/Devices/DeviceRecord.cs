@@ -11,4 +11,5 @@ public sealed record DeviceRecord(
     string SecretSaltBase64,
     string SecretHashBase64,
     DateTimeOffset EnrolledAtUtc,
-    DateTimeOffset? RevokedAtUtc);
+    DateTimeOffset? RevokedAtUtc,
+    int FailedPasswordAttempts = 0);
