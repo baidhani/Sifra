@@ -17,7 +17,7 @@
                  the content Grid itself. ~18px closes that gap (measured via
                  UI Automation: title-bar-top-to-icon vs button-to-window-
                  bottom were 178px vs 160px before this). -->
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316" Margin="0,0,0,18">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="276" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Unlock your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,20"/>
 

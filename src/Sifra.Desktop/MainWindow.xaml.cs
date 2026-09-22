@@ -458,12 +458,15 @@ public partial class MainWindow : FluentWindow
 
     private void SetUnlockWindowSize()
     {
-        // Same size as Setup for now (they started as one shared method) —
-        // free to diverge independently going forward. If this height
-        // changes, re-verify UnlockView's centering Margin (currently tuned
-        // via UI Automation measurement for height=560 — see UnlockView.xaml)
-        // rather than assuming it still holds at a different height.
-        ApplyCompactWindowChrome(480, 560);
+        // 100px narrower and 100px shorter than Setup's 480x560 (four rounds
+        // of reduction, per explicit request) — re-verify UnlockView's
+        // centering Margin (tuned via UI Automation measurement, see
+        // UnlockView.xaml) any time the height changes again, rather than
+        // assuming it still holds. Confirmed still exact (equal top/bottom
+        // gaps) at 540, 500, and 460. Width has 380 - 64 (card padding) =
+        // 316px available; UnlockView's content StackPanel is 276px wide,
+        // comfortably inside that, so no clipping risk there.
+        ApplyCompactWindowChrome(380, 460);
     }
 
     private void SetShellWindowSize()
