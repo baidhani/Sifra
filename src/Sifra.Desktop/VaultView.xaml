@@ -188,6 +188,18 @@
                     </Expander>
 
                     <Expander Header="Tags" IsExpanded="True" Style="{StaticResource SidebarSectionExpander}">
+                        <!-- Right-clicking an individual tag row shows that
+                             row's own ContextMenu (set in code, per tag) —
+                             WPF resolves the nearest ancestor with a
+                             non-null ContextMenu, so this one only ever
+                             fires for the header itself or blank space
+                             below the tags. -->
+                        <Expander.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Add label" Icon="{ui:SymbolIcon Tag24}" Click="OnTagsGroupAddLabelClick"/>
+                                <MenuItem Header="Export..." Icon="{ui:SymbolIcon ArrowExportLtr24}" Click="OnTagsGroupExportClick"/>
+                            </ContextMenu>
+                        </Expander.ContextMenu>
                         <StackPanel x:Name="TagCategoryPanel"/>
                     </Expander>
 

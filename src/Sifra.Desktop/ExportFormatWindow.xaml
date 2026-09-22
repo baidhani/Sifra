@@ -1,11 +1,11 @@
-<ui:FluentWindow x:Class="Sifra.Desktop.AddTagWindow"
+<ui:FluentWindow x:Class="Sifra.Desktop.ExportFormatWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="Add Tag" Height="380" Width="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Title="Export As" Height="360" Width="420" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
         Background="{DynamicResource Sifra.WindowBrush}">
     <Grid Background="{DynamicResource Sifra.WindowBrush}">
@@ -15,18 +15,15 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
-                     Background="{DynamicResource Sifra.WindowBrush}" ShowMaximize="False" ShowMinimize="False"/>
+        <ui:TitleBar Grid.Row="0" Title="Export As" Background="{DynamicResource Sifra.WindowBrush}"
+                     ShowMaximize="False" ShowMinimize="False"/>
 
         <StackPanel Grid.Row="1" Margin="20">
-            <ui:TextBlock Text="Name:" FontTypography="BodyStrong" Margin="0,0,0,6"/>
-            <ui:TextBox x:Name="NameBox" Margin="0,0,0,16"/>
+            <ui:TextBlock Text="Select a file format for exported data:" FontTypography="BodyStrong" Margin="0,0,0,20"/>
 
-            <ui:TextBlock Text="Color:" FontTypography="BodyStrong" Margin="0,0,0,10"/>
-            <WrapPanel x:Name="ColorSwatchesPanel" Margin="0,0,0,16"/>
-
-            <CheckBox x:Name="PinToTopCheckBox" Content="Pin to top"
-                      Foreground="{DynamicResource Sifra.TextPrimaryBrush}"/>
+            <RadioButton x:Name="XmlOption" GroupName="ExportFormat" Content="Extensible Markup Language (XML)" Margin="0,0,0,16"/>
+            <RadioButton x:Name="TxtOption" GroupName="ExportFormat" Content="Plain text (TXT)" IsChecked="True" Margin="0,0,0,16"/>
+            <RadioButton x:Name="CsvOption" GroupName="ExportFormat" Content="Comma-Separated Values (CSV)"/>
         </StackPanel>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">

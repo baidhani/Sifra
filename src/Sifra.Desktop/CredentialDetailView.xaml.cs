@@ -12,11 +12,33 @@ using Sifra.Vault.Health;
 
 namespace Sifra.Desktop;
 
-/// <summary>Row view model backing one tag chip in the detail pane's Tags section.</summary>
+/// <summary>Row view model backing one tag chip in the detail pane's Tags section (and, icon-only, the list row's tag summary).</summary>
 public sealed class TagChipViewModel
 {
     public required string Name { get; init; }
     public required System.Windows.Media.Brush ColorBrush { get; init; }
+
+    /// <summary>
+    /// A translucent tint of the same color as ColorBrush, for the detail
+    /// pane chip's background — full-opacity tag color as a solid pill fill
+    /// was too visually loud, but the chip previously used one fixed brush
+    /// (Sifra.SelectedBrush) for every tag regardless of its own color,
+    /// which made different tags hard to tell apart at a glance. This keeps
+    /// each chip's hue distinct while staying subtle enough to sit calmly
+    /// next to the rest of the detail pane.
+    /// </summary>
+    public required System.Windows.Media.Brush BackgroundBrush { get; init; }
+
+    public static TagChipViewModel Create(string name, string colorHex)
+    {
+        var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(colorHex);
+        return new TagChipViewModel
+        {
+            Name = name,
+            ColorBrush = new System.Windows.Media.SolidColorBrush(color),
+            BackgroundBrush = new System.Windows.Media.SolidColorBrush(color) { Opacity = 0.28 },
+        };
+    }
 }
 
 /// <summary>
@@ -186,13 +208,9 @@ public partial class CredentialDetailView : UserControl
         // A tag missing from the registry (e.g. added via the CLI) has no
         // known color — fall back to the same neutral gray used elsewhere.
         var colorByName = _services.Tags.List().ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
-        TagsList.ItemsSource = tags.Select(t => new TagChipViewModel
-        {
-            Name = t,
-            ColorBrush = new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(
-                    colorByName.TryGetValue(t, out var hex) ? hex : "#7F8C8D")),
-        }).ToList();
+        TagsList.ItemsSource = tags
+            .Select(t => TagChipViewModel.Create(t, colorByName.TryGetValue(t, out var hex) ? hex : "#7F8C8D"))
+            .ToList();
 
         // "Notes" is pulled out of the generic Fields list and given its own
         // section here, mirroring the same special treatment the Add/Edit

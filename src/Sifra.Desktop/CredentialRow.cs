@@ -54,12 +54,7 @@ public sealed class CredentialRow : INotifyPropertyChanged
         // via the CLI) falls back to a neutral gray icon rather than being
         // silently dropped.
         TagChips = Tags
-            .Select(t => new TagChipViewModel
-            {
-                Name = t,
-                ColorBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
-                    tagColors is not null && tagColors.TryGetValue(t, out var hex) ? hex : "#7F8C8D")),
-            })
+            .Select(t => TagChipViewModel.Create(t, tagColors is not null && tagColors.TryGetValue(t, out var hex) ? hex : "#7F8C8D"))
             .ToList();
 
         // Same icon rendering rules as CredentialDetailView's avatar: an

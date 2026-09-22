@@ -1,3 +1,5 @@
+using System.Text;
+using System.Xml.Linq;
 using Sifra.Vault.Audit;
 using Sifra.Vault.Crypto;
 using Sifra.Vault.Sync;
@@ -192,6 +194,108 @@ public sealed class CredentialService
         return string.Join(Environment.NewLine, lines);
     }
 
+    /// <summary>
+    /// Exports every credential carrying the given tag into a single
+    /// string in the requested format — for the tag context menu's
+    /// "Export..." action. Tag matching is case-insensitive, same as
+    /// everywhere else tags are compared in this codebase.
+    /// </summary>
+    public string ExportByTag(string vaultCredential, string tagName, CredentialExportFormat format)
+    {
+        var matches = List(vaultCredential)
+            .Where(v => v.Tags?.Contains(tagName, StringComparer.OrdinalIgnoreCase) == true)
+            .ToList();
+
+        var text = format switch
+        {
+            CredentialExportFormat.Csv => BuildCsvExport(matches),
+            CredentialExportFormat.Xml => BuildXmlExport(matches),
+            _ => BuildPlainTextExport(matches),
+        };
+
+        _auditLogger?.Log(nameof(ExportByTag), Environment.UserName, details: $"tag={tagName} format={format} count={matches.Count}");
+        return text;
+    }
+
+    /// <summary>Exports every credential that carries at least one tag into a single string in the requested format — for the Tags group header's "Export..." action.</summary>
+    public string ExportAllTagged(string vaultCredential, CredentialExportFormat format)
+    {
+        var matches = List(vaultCredential)
+            .Where(v => v.Tags is { Count: > 0 })
+            .ToList();
+
+        var text = format switch
+        {
+            CredentialExportFormat.Csv => BuildCsvExport(matches),
+            CredentialExportFormat.Xml => BuildXmlExport(matches),
+            _ => BuildPlainTextExport(matches),
+        };
+
+        _auditLogger?.Log(nameof(ExportAllTagged), Environment.UserName, details: $"format={format} count={matches.Count}");
+        return text;
+    }
+
+    private static string BuildPlainTextExport(IReadOnlyList<CredentialView> views)
+    {
+        // A blank line between entries so a multi-credential export reads
+        // as distinct blocks rather than one run-on list of fields.
+        return string.Join(Environment.NewLine + Environment.NewLine, views.Select(BuildPlainTextSummary));
+    }
+
+    /// <summary>
+    /// One row per credential; columns are Label plus the union of every
+    /// distinct field name across the exported credentials (blank cell
+    /// where a given credential doesn't have that field) — there's no
+    /// fixed schema to export against since this app's field model is
+    /// fully dynamic (see CredentialService's own remarks up top).
+    /// </summary>
+    private static string BuildCsvExport(IReadOnlyList<CredentialView> views)
+    {
+        var fieldNames = views
+            .SelectMany(v => v.Fields.Select(f => f.Name))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", new[] { "Label" }.Concat(fieldNames).Select(CsvEscape)));
+
+        foreach (var view in views)
+        {
+            var valuesByName = view.Fields
+                .GroupBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
+
+            var cells = new List<string> { view.Label };
+            cells.AddRange(fieldNames.Select(name => valuesByName.TryGetValue(name, out var value) ? value : string.Empty));
+            sb.AppendLine(string.Join(",", cells.Select(CsvEscape)));
+        }
+
+        return sb.ToString();
+    }
+
+    private static string CsvEscape(string value)
+    {
+        // RFC 4180: quote a field that contains a comma, quote, or newline; double up any internal quotes.
+        if (value.IndexOfAny([',', '"', '\r', '\n']) < 0)
+        {
+            return value;
+        }
+
+        return $"\"{value.Replace("\"", "\"\"")}\"";
+    }
+
+    private static string BuildXmlExport(IReadOnlyList<CredentialView> views)
+    {
+        var root = new XElement("Credentials",
+            views.Select(v => new XElement("Credential",
+                new XElement("Label", v.Label),
+                new XElement("Fields",
+                    v.Fields.Where(f => f.Value.Length > 0).Select(f =>
+                        new XElement("Field", new XAttribute("name", f.Name), new XAttribute("type", f.Type), f.Value))))));
+
+        return new XDocument(root).ToString();
+    }
+
     /// <summary>Sets the credential's icon (symbol/color/custom/website-favicon) without touching any other field.</summary>
     /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
     public void SetIcon(string id, CredentialIcon? icon)
@@ -208,6 +312,44 @@ public sealed class CredentialService
         var record = FindOrThrow(id);
         _store.Upsert(record with { Tags = tags, UpdatedAtUtc = DateTimeOffset.UtcNow });
         _auditLogger?.Log(nameof(SetTags), Environment.UserName, details: $"id={id} tagCount={tags.Count}");
+    }
+
+    /// <summary>
+    /// Renames a tag on every credential that carries it — the tag
+    /// registry entry itself is TagService's own concern (see
+    /// TagService.Rename); this only touches the plain-string Tags list
+    /// stored per credential, which is why it needs no vault credential
+    /// (Tags aren't encrypted).
+    /// </summary>
+    /// <returns>How many credentials were updated.</returns>
+    public int RenameTagEverywhere(string oldName, string newName)
+    {
+        var affected = _store.GetAll().Where(c => c.Tags?.Contains(oldName, StringComparer.OrdinalIgnoreCase) == true).ToList();
+        foreach (var record in affected)
+        {
+            var updatedTags = record.Tags!
+                .Select(t => string.Equals(t, oldName, StringComparison.OrdinalIgnoreCase) ? newName : t)
+                .ToList();
+            _store.Upsert(record with { Tags = updatedTags, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        }
+
+        _auditLogger?.Log(nameof(RenameTagEverywhere), Environment.UserName, details: $"count={affected.Count}");
+        return affected.Count;
+    }
+
+    /// <summary>Removes a tag from every credential that carries it — see RenameTagEverywhere's remarks on the split of responsibility with TagService.</summary>
+    /// <returns>How many credentials were updated.</returns>
+    public int RemoveTagEverywhere(string name)
+    {
+        var affected = _store.GetAll().Where(c => c.Tags?.Contains(name, StringComparer.OrdinalIgnoreCase) == true).ToList();
+        foreach (var record in affected)
+        {
+            var updatedTags = record.Tags!.Where(t => !string.Equals(t, name, StringComparison.OrdinalIgnoreCase)).ToList();
+            _store.Upsert(record with { Tags = updatedTags, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        }
+
+        _auditLogger?.Log(nameof(RemoveTagEverywhere), Environment.UserName, details: $"count={affected.Count}");
+        return affected.Count;
     }
 
     /// <summary>Toggles IsFavorite without needing every other field — a common, low-risk single-flag update.</summary>

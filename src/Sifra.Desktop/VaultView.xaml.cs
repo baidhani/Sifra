@@ -47,7 +47,7 @@ public partial class VaultView : UserControl
         // this screen sits behind it — refresh the sidebar the moment that
         // happens rather than waiting for the Add/Edit Credential window to
         // close.
-        _services.Tags.TagAdded += (_, _) => BuildTagCategories();
+        _services.Tags.TagsChanged += (_, _) => TryRefresh();
 
         // Set after InitializeComponent (not via XAML IsChecked="True") —
         // XAML's IsChecked raises Checked synchronously during parsing,
@@ -165,6 +165,7 @@ public partial class VaultView : UserControl
         var registeredTags = _services.Tags.List();
         var registeredNames = registeredTags.Select(t => t.Name).ToList();
         var colorByName = registeredTags.ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
+        var definitionByName = registeredTags.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
         var usedNames = _allRows.SelectMany(r => r.Tags).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var unregisteredUsedNames = usedNames
             .Where(n => !registeredNames.Contains(n, StringComparer.OrdinalIgnoreCase))
@@ -213,6 +214,7 @@ public partial class VaultView : UserControl
                 Tag = tag,
                 Content = content,
                 IsChecked = previousSelection == tag,
+                ContextMenu = BuildTagContextMenu(tag, definitionByName.GetValueOrDefault(tag)),
             };
             radio.Checked += OnCategoryChanged;
             TagCategoryPanel.Children.Add(radio);
@@ -226,6 +228,204 @@ public partial class VaultView : UserControl
         {
             _category = "All";
             AllItemsCategory.IsChecked = true;
+        }
+    }
+
+    /// <summary>
+    /// Built fresh per tag on every BuildTagCategories() pass — cheap
+    /// (there are never many tags) and much simpler than trying to update a
+    /// static XAML-declared menu's item visibility/handlers for a dynamic
+    /// per-tag target the way the credential list's ContextMenuOpening does.
+    /// A tag missing from the registry (e.g. added via the CLI, no
+    /// TagDefinition to rename/recolor/pin/delete) only gets Add label and
+    /// Export — the rest need a registry id that doesn't exist for it.
+    /// </summary>
+    private ContextMenu BuildTagContextMenu(string tagName, Sifra.Vault.Tags.TagDefinition? definition)
+    {
+        var menu = new ContextMenu();
+
+        var addItem = new MenuItem { Header = "Add label", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Tag24 } };
+        addItem.Click += (_, _) => OnTagAddLabelClick();
+        menu.Items.Add(addItem);
+
+        if (definition is not null)
+        {
+            menu.Items.Add(new Separator());
+
+            var renameItem = new MenuItem { Header = "Rename", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Rename24 } };
+            renameItem.Click += (_, _) => OnTagEditClick(definition);
+            menu.Items.Add(renameItem);
+
+            var colorItem = new MenuItem { Header = "Select color", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Color24 } };
+            colorItem.Click += (_, _) => OnTagEditClick(definition);
+            menu.Items.Add(colorItem);
+
+            var pinItem = new MenuItem
+            {
+                Header = definition.PinnedToTop ? "Unpin from top" : "Pin to top",
+                Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = definition.PinnedToTop ? Wpf.Ui.Controls.SymbolRegular.PinOff24 : Wpf.Ui.Controls.SymbolRegular.Pin24 },
+            };
+            pinItem.Click += (_, _) => OnTagTogglePinClick(definition);
+            menu.Items.Add(pinItem);
+
+            menu.Items.Add(new Separator());
+
+            var deleteItem = new MenuItem { Header = "Delete", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.Delete24 } };
+            deleteItem.Click += (_, _) => OnTagDeleteClick(definition);
+            menu.Items.Add(deleteItem);
+        }
+
+        menu.Items.Add(new Separator());
+        var exportItem = new MenuItem { Header = "Export...", Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = Wpf.Ui.Controls.SymbolRegular.ArrowExportLtr24 } };
+        exportItem.Click += (_, _) => OnTagExportClick(tagName);
+        menu.Items.Add(exportItem);
+
+        return menu;
+    }
+
+    private void OnTagAddLabelClick()
+    {
+        var dialog = new AddTagWindow { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            _services.Tags.Add(dialog.TagName, dialog.TagColor, dialog.PinToTop);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ThemedMessageBox.Show(Window.GetWindow(this), ex.Message, "Sifra", ThemedMessageBox.Icon.Warning);
+        }
+    }
+
+    /// <summary>Shared by both Rename and Select Color — same small dialog, prefilled, covers both edits in one place.</summary>
+    private void OnTagEditClick(Sifra.Vault.Tags.TagDefinition definition)
+    {
+        var dialog = new AddTagWindow(definition) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!string.Equals(dialog.TagName, definition.Name, StringComparison.Ordinal))
+            {
+                var oldName = _services.Tags.Rename(definition.Id, dialog.TagName);
+                _services.Credentials.RenameTagEverywhere(oldName, dialog.TagName);
+            }
+
+            if (!string.Equals(dialog.TagColor, definition.Color, StringComparison.OrdinalIgnoreCase))
+            {
+                _services.Tags.SetColor(definition.Id, dialog.TagColor);
+            }
+
+            if (dialog.PinToTop != definition.PinnedToTop)
+            {
+                _services.Tags.SetPinned(definition.Id, dialog.PinToTop);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            ThemedMessageBox.Show(Window.GetWindow(this), ex.Message, "Sifra", ThemedMessageBox.Icon.Warning);
+            return;
+        }
+
+        // TagsChanged (raised inside Tags.Rename/SetColor/SetPinned above)
+        // already triggered one refresh, but for a rename that one fires
+        // before RenameTagEverywhere runs, so it can show the credentials
+        // still carrying the old tag name for a moment — this final
+        // refresh guarantees the settled, fully-consistent state.
+        TryRefresh();
+    }
+
+    private void OnTagTogglePinClick(Sifra.Vault.Tags.TagDefinition definition)
+    {
+        _services.Tags.SetPinned(definition.Id, !definition.PinnedToTop);
+    }
+
+    private void OnTagDeleteClick(Sifra.Vault.Tags.TagDefinition definition)
+    {
+        var confirmed = ThemedMessageBox.ShowConfirm(
+            Window.GetWindow(this),
+            $"Delete the tag \"{definition.Name}\"? It will be removed from every credential that has it — the credentials themselves are not affected.",
+            "Delete Tag");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _services.Tags.Delete(definition.Id);
+        _services.Credentials.RemoveTagEverywhere(definition.Name);
+        if (_category == definition.Name)
+        {
+            _category = "All";
+            AllItemsCategory.IsChecked = true;
+        }
+
+        // See OnTagEditClick's remarks — Tags.Delete's own TagsChanged
+        // refresh runs before RemoveTagEverywhere, so this final call
+        // guarantees the settled state.
+        TryRefresh();
+    }
+
+    private void OnTagExportClick(string tagName)
+    {
+        var choice = PromptExportFormatAndPath(tagName);
+        if (choice is not { } chosen)
+        {
+            return;
+        }
+
+        WriteExportFile(chosen.Path, () => _services.Credentials.ExportByTag(_vaultCredential, tagName, chosen.Format));
+    }
+
+    private void OnTagsGroupAddLabelClick(object sender, RoutedEventArgs e) => OnTagAddLabelClick();
+
+    private void OnTagsGroupExportClick(object sender, RoutedEventArgs e)
+    {
+        var choice = PromptExportFormatAndPath("Tagged Credentials");
+        if (choice is not { } chosen)
+        {
+            return;
+        }
+
+        WriteExportFile(chosen.Path, () => _services.Credentials.ExportAllTagged(_vaultCredential, chosen.Format));
+    }
+
+    /// <summary>Shared by both the per-tag and the group-header Export actions — picks a format (XML/TXT/CSV) then a destination file. Null if the user cancels either dialog.</summary>
+    private (Sifra.Vault.Credentials.CredentialExportFormat Format, string Path)? PromptExportFormatAndPath(string defaultFileName)
+    {
+        var formatDialog = new ExportFormatWindow { Owner = Window.GetWindow(this) };
+        if (formatDialog.ShowDialog() != true)
+        {
+            return null;
+        }
+
+        var (extension, filter) = formatDialog.SelectedFormat switch
+        {
+            Sifra.Vault.Credentials.CredentialExportFormat.Xml => (".xml", "XML file (*.xml)|*.xml|All files (*.*)|*.*"),
+            Sifra.Vault.Credentials.CredentialExportFormat.Csv => (".csv", "CSV file (*.csv)|*.csv|All files (*.*)|*.*"),
+            _ => (".txt", "Text file (*.txt)|*.txt|All files (*.*)|*.*"),
+        };
+
+        var saveDialog = new SaveFileDialog { FileName = defaultFileName, DefaultExt = extension, Filter = filter };
+        return saveDialog.ShowDialog() == true ? (formatDialog.SelectedFormat, saveDialog.FileName) : null;
+    }
+
+    private void WriteExportFile(string path, Func<string> buildContent)
+    {
+        try
+        {
+            File.WriteAllText(path, buildContent());
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Failure path: e.g. the target file is open in another program, or the folder is read-only.
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not save this file.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 

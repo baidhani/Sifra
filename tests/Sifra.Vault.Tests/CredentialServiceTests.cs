@@ -227,6 +227,135 @@ public sealed class CredentialServiceTests : IDisposable
     }
 
     [Fact]
+    public void RenameTagEverywhere_UpdatesTheTagOnEveryCarryingCredential()
+    {
+        var service = CreateService();
+        var workId = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work", "Dev" });
+        var personalId = service.Add(VaultCredential, "Netflix", LoginFields("firas", "pw", "https://netflix.com"), tags: new[] { "Personal" });
+
+        var count = service.RenameTagEverywhere("Work", "Job");
+
+        Assert.Equal(1, count);
+        Assert.Equal(new[] { "Job", "Dev" }, service.GetById(VaultCredential, workId).Tags);
+        Assert.Equal(new[] { "Personal" }, service.GetById(VaultCredential, personalId).Tags);
+    }
+
+    [Fact]
+    public void RenameTagEverywhere_WhenNoCredentialCarriesTheTag_ReturnsZeroAndChangesNothing()
+    {
+        // Failure/edge path: "the tag being renamed isn't actually used anywhere."
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Dev" });
+
+        var count = service.RenameTagEverywhere("Work", "Job");
+
+        Assert.Equal(0, count);
+        Assert.Equal(new[] { "Dev" }, service.GetById(VaultCredential, id).Tags);
+    }
+
+    [Fact]
+    public void RemoveTagEverywhere_RemovesOnlyThatTagFromEveryCarryingCredential()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work", "Dev" });
+
+        var count = service.RemoveTagEverywhere("Work");
+
+        Assert.Equal(1, count);
+        Assert.Equal(new[] { "Dev" }, service.GetById(VaultCredential, id).Tags);
+    }
+
+    [Fact]
+    public void ExportByTag_PlainText_IncludesOnlyMatchingCredentials()
+    {
+        var service = CreateService();
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work" });
+        service.Add(VaultCredential, "Netflix", LoginFields("firas", "pw", "https://netflix.com"), tags: new[] { "Personal" });
+
+        var text = service.ExportByTag(VaultCredential, "Work", CredentialExportFormat.PlainText);
+
+        Assert.Contains("GitHub", text);
+        Assert.DoesNotContain("Netflix", text);
+    }
+
+    [Fact]
+    public void ExportByTag_Csv_HasAHeaderRowAndOneDataRowPerCredential()
+    {
+        var service = CreateService();
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work" });
+
+        var csv = service.ExportByTag(VaultCredential, "Work", CredentialExportFormat.Csv);
+        var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal("Label,Username,Password,Website", lines[0]);
+        Assert.Equal("GitHub,firas,hunter2,https://github.com", lines[1]);
+    }
+
+    [Fact]
+    public void ExportByTag_Csv_EscapesValuesContainingCommas()
+    {
+        // Failure/edge path: "a field value itself contains a comma."
+        var service = CreateService();
+        service.Add(VaultCredential, "Note", [("Notes", "a, b, c", CustomFieldType.Text)], tags: new[] { "Work" });
+
+        var csv = service.ExportByTag(VaultCredential, "Work", CredentialExportFormat.Csv);
+
+        Assert.Contains("\"a, b, c\"", csv);
+    }
+
+    [Fact]
+    public void ExportByTag_Xml_ProducesOneCredentialElementPerMatch()
+    {
+        var service = CreateService();
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work" });
+
+        var xml = service.ExportByTag(VaultCredential, "Work", CredentialExportFormat.Xml);
+        var doc = System.Xml.Linq.XDocument.Parse(xml);
+
+        var credentialElement = Assert.Single(doc.Root!.Elements("Credential"));
+        Assert.Equal("GitHub", credentialElement.Element("Label")!.Value);
+    }
+
+    [Fact]
+    public void ExportByTag_ForATagNoCredentialCarries_ReturnsAnEmptyExport()
+    {
+        // Failure/edge path: "the tag has no matching credentials."
+        var service = CreateService();
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Dev" });
+
+        var text = service.ExportByTag(VaultCredential, "DoesNotExist", CredentialExportFormat.PlainText);
+
+        Assert.Equal(string.Empty, text);
+    }
+
+    [Fact]
+    public void ExportAllTagged_IncludesEveryCredentialWithAtLeastOneTag()
+    {
+        var service = CreateService();
+        service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), tags: new[] { "Work" });
+        service.Add(VaultCredential, "Netflix", LoginFields("firas", "pw", "https://netflix.com"), tags: new[] { "Personal" });
+        service.Add(VaultCredential, "Untagged", LoginFields("firas", "pw2"));
+
+        var text = service.ExportAllTagged(VaultCredential, CredentialExportFormat.PlainText);
+
+        Assert.Contains("GitHub", text);
+        Assert.Contains("Netflix", text);
+        Assert.DoesNotContain("Untagged", text);
+    }
+
+    [Fact]
+    public void ExportAllTagged_WhenNoCredentialHasATag_ReturnsAnEmptyExport()
+    {
+        // Failure/edge path: "no credential in the vault has any tag at all."
+        var service = CreateService();
+        service.Add(VaultCredential, "Untagged", LoginFields("firas", "pw"));
+
+        var text = service.ExportAllTagged(VaultCredential, CredentialExportFormat.PlainText);
+
+        Assert.Equal(string.Empty, text);
+    }
+
+    [Fact]
     public void CopyUsername_HasNoDependencyOnConnectivityAtAll()
     {
         // Failure path: "user tries to copy while offline." CredentialService

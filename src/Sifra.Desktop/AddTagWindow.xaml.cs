@@ -26,11 +26,31 @@ public partial class AddTagWindow : Wpf.Ui.Controls.FluentWindow
     public string TagColor { get; private set; } = Palette[0];
     public bool PinToTop { get; private set; }
 
-    public AddTagWindow()
+    /// <param name="existing">
+    /// Null for the normal "create a new tag" flow. Passing an existing
+    /// tag switches the window into edit mode (title becomes "Edit Tag",
+    /// every field prefilled with its current values) — reused by both the
+    /// tag context menu's Rename and Select Color actions rather than
+    /// building two near-identical small dialogs.
+    /// </param>
+    public AddTagWindow(Sifra.Vault.Tags.TagDefinition? existing = null)
     {
         InitializeComponent();
         BuildSwatches();
         NameBox.TextChanged += (_, _) => UpdateOkEnabled();
+
+        if (existing is not null)
+        {
+            Title = "Edit Tag";
+            NameBox.Text = existing.Name;
+            PinToTopCheckBox.IsChecked = existing.PinnedToTop;
+            var matchingSwatch = _swatches.FirstOrDefault(s => string.Equals((string)s.Tag, existing.Color, StringComparison.OrdinalIgnoreCase));
+            if (matchingSwatch is not null)
+            {
+                SelectSwatch(matchingSwatch, existing.Color);
+            }
+        }
+
         UpdateOkEnabled();
     }
 
