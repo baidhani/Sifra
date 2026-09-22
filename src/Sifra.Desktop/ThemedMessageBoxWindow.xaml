@@ -12,21 +12,61 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <ui:TitleBar Grid.Row="0" Title="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
                      Background="{DynamicResource Sifra.WindowBrush}" ShowMaximize="False" ShowMinimize="False"/>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20">
-            <ui:SymbolIcon x:Name="MessageIcon" FontSize="24" VerticalAlignment="Top" Margin="0,2,14,0"/>
-            <ui:TextBlock x:Name="MessageText" FontTypography="Body" TextWrapping="Wrap" MaxWidth="320"
-                          Foreground="{DynamicResource Sifra.TextPrimaryBrush}"/>
-        </StackPanel>
+        <!-- Single unified body zone (icon + message + buttons together) —
+             matches the native MessageBox's two-tone look (title bar / body)
+             rather than the three-zone card-plus-separate-footer convention
+             AddCredentialWindow and SetTagsWindow use for their multi-field
+             forms, since this control's whole job is to stand in for
+             MessageBox.Show, not to look like a form dialog. -->
+        <Border Grid.Row="1" Background="{DynamicResource Sifra.CardBrush}"
+                BorderBrush="{DynamicResource Sifra.BorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Margin="20">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                    <!-- Vector icons traced from the Sifra identity package's
+                         03_UI_Icons/Status SVGs (info/warning; error is a
+                         hand-drawn stopgap in the same style — the package has
+                         no error icon yet) rather than the Fluent icon font's
+                         SymbolIcon, whose glyphs read as too heavy/chunky at
+                         this size. Same 24x24 coordinate space as the
+                         source SVGs (which use 1.8 stroke-width; dialed
+                         down further to 1.2 per user feedback), scaled up via
+                         Viewbox so the thin-line proportions are preserved
+                         at any display size. Exactly one of the three
+                         Canvases is made Visible by Configure(); stroke/fill
+                         brushes are also set there per severity. -->
+                    <Viewbox Width="40" Height="40" VerticalAlignment="Top" Margin="0,0,16,0">
+                        <Grid Width="24" Height="24">
+                            <Canvas x:Name="InfoIcon" Width="24" Height="24" Visibility="Collapsed">
+                                <Ellipse x:Name="InfoCircle" Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" StrokeThickness="1.2"/>
+                                <Line x:Name="InfoLine" X1="12" Y1="11" X2="12" Y2="17" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Ellipse x:Name="InfoDot" Canvas.Left="11.1" Canvas.Top="6.1" Width="1.8" Height="1.8"/>
+                            </Canvas>
+                            <Canvas x:Name="WarningIcon" Width="24" Height="24" Visibility="Collapsed">
+                                <Polygon x:Name="WarningTriangle" Points="12,3 22,20 2,20" StrokeThickness="1.2" StrokeLineJoin="Round"/>
+                                <Line x:Name="WarningLine" X1="12" Y1="9" X2="12" Y2="14" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Ellipse x:Name="WarningDot" Canvas.Left="11.1" Canvas.Top="16.1" Width="1.8" Height="1.8"/>
+                            </Canvas>
+                            <Canvas x:Name="ErrorIcon" Width="24" Height="24" Visibility="Collapsed">
+                                <Ellipse x:Name="ErrorCircle" Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" StrokeThickness="1.2"/>
+                                <Line x:Name="ErrorX1" X1="9" Y1="9" X2="15" Y2="15" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                <Line x:Name="ErrorX2" X1="15" Y1="9" X2="9" Y2="15" StrokeThickness="1.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Grid>
+                    </Viewbox>
+                    <ui:TextBlock x:Name="MessageText" FontTypography="Body" TextWrapping="Wrap" MaxWidth="320"
+                                  Foreground="{DynamicResource Sifra.TextPrimaryBrush}"/>
+                </StackPanel>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">
-            <ui:Button x:Name="SecondaryButton" Margin="0,0,10,0" Click="OnSecondaryClick"/>
-            <ui:Button x:Name="PrimaryButton" Appearance="Primary" Click="OnPrimaryClick"/>
-        </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <ui:Button x:Name="SecondaryButton" MinWidth="96" Margin="0,0,10,0" Click="OnSecondaryClick"/>
+                    <ui:Button x:Name="PrimaryButton" MinWidth="96" Appearance="Primary" Click="OnPrimaryClick"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </ui:FluentWindow>

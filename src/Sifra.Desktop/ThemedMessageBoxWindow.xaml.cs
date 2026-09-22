@@ -24,14 +24,38 @@ public partial class ThemedMessageBoxWindow : Wpf.Ui.Controls.FluentWindow
         Title = title;
         MessageText.Text = message;
 
-        var (symbol, brush) = icon switch
+        var brush = icon switch
         {
-            ThemedMessageBox.Icon.Warning => (Wpf.Ui.Controls.SymbolRegular.Warning24, new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B))),
-            ThemedMessageBox.Icon.Error => (Wpf.Ui.Controls.SymbolRegular.ErrorCircle24, new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D))),
-            _ => (Wpf.Ui.Controls.SymbolRegular.Info24, new SolidColorBrush(Color.FromRgb(0x5B, 0x8D, 0xEF))),
+            ThemedMessageBox.Icon.Warning => new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)),
+            ThemedMessageBox.Icon.Error => new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D)),
+            _ => new SolidColorBrush(Color.FromRgb(0x5B, 0x8D, 0xEF)),
         };
-        MessageIcon.Symbol = symbol;
-        MessageIcon.Foreground = brush;
+
+        InfoIcon.Visibility = Visibility.Collapsed;
+        WarningIcon.Visibility = Visibility.Collapsed;
+        ErrorIcon.Visibility = Visibility.Collapsed;
+
+        switch (icon)
+        {
+            case ThemedMessageBox.Icon.Warning:
+                WarningIcon.Visibility = Visibility.Visible;
+                WarningTriangle.Stroke = brush;
+                WarningLine.Stroke = brush;
+                WarningDot.Fill = brush;
+                break;
+            case ThemedMessageBox.Icon.Error:
+                ErrorIcon.Visibility = Visibility.Visible;
+                ErrorCircle.Stroke = brush;
+                ErrorX1.Stroke = brush;
+                ErrorX2.Stroke = brush;
+                break;
+            default:
+                InfoIcon.Visibility = Visibility.Visible;
+                InfoCircle.Stroke = brush;
+                InfoLine.Stroke = brush;
+                InfoDot.Fill = brush;
+                break;
+        }
 
         PrimaryButton.Content = primaryText;
 
