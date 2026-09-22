@@ -1,6 +1,7 @@
 using Sifra.Vault.Audit;
 using Sifra.Vault.Auth;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Sync;
 
 namespace Sifra.Vault.Session;
 
@@ -27,12 +28,26 @@ public sealed class MasterPasswordService
     private readonly VaultAuthenticator _authenticator;
     private readonly VaultEncryptionService _encryption;
     private readonly AuditLogger? _auditLogger;
+    private readonly ICloudKeySlotStore? _cloudKeySlotStore;
 
-    public MasterPasswordService(VaultAuthenticator authenticator, VaultEncryptionService encryption, AuditLogger? auditLogger = null)
+    /// <param name="cloudKeySlotStore">
+    /// Optional (Phase 3). When provided, a successful password change
+    /// re-publishes the master-password slot so devices that join this
+    /// vault via the cloud keep working with the new password. Without
+    /// this, a device that joined earlier would silently fail to unwrap
+    /// the vault the next time it tried to (re-)join. Null means no cloud
+    /// vault is configured — existing callers and tests are unaffected.
+    /// </param>
+    public MasterPasswordService(
+        VaultAuthenticator authenticator,
+        VaultEncryptionService encryption,
+        AuditLogger? auditLogger = null,
+        ICloudKeySlotStore? cloudKeySlotStore = null)
     {
         _authenticator = authenticator;
         _encryption = encryption;
         _auditLogger = auditLogger;
+        _cloudKeySlotStore = cloudKeySlotStore;
     }
 
     /// <exception cref="IncorrectMasterPasswordException">The current password is wrong.</exception>
@@ -52,7 +67,33 @@ public sealed class MasterPasswordService
         _encryption.RewrapMasterKey(currentPassword, newPassword);
         _authenticator.SetCredential(newPassword);
 
+        if (_cloudKeySlotStore is not null)
+        {
+            RepublishToCloud();
+        }
+
         // Never log either password value — only that the change happened.
         _auditLogger?.Log(nameof(ChangePassword), Environment.UserName);
+    }
+
+    /// <summary>
+    /// Best-effort: the local password change already succeeded and must
+    /// never be rolled back for a cloud hiccup. If the cloud is
+    /// unreachable, this device simply keeps the newly rewrapped slot
+    /// un-published — the SAME slot re-publishes cleanly (it's just a
+    /// re-upload, not an append) whenever this method next runs, so
+    /// nothing here needs its own retry queue.
+    /// </summary>
+    private void RepublishToCloud()
+    {
+        try
+        {
+            _cloudKeySlotStore!.UploadMasterPasswordSlot(_encryption.GetSlotOrThrow(VaultEncryptionService.MasterPasswordSlot));
+            _auditLogger?.Log(nameof(RepublishToCloud), Environment.UserName, details: "outcome=success");
+        }
+        catch (SyncUnavailableException)
+        {
+            _auditLogger?.Log(nameof(RepublishToCloud), Environment.UserName, details: "outcome=cloud_unavailable");
+        }
     }
 }

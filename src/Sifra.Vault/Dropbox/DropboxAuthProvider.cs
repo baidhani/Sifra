@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.Versioning;
 using global::Dropbox.Api;
 using Sifra.Vault.Auth;
 
@@ -11,18 +12,27 @@ namespace Sifra.Vault.Dropbox;
 /// same as Google/OneDrive's public-client model). Runs a local loopback
 /// HTTP listener to catch the redirect, mirroring what MSAL/Google's
 /// libraries do internally. Entirely separate from vault authentication,
-/// per the project guardrail.
+/// per the project guardrail. Windows-only since persistent silent
+/// reconnect (TrySilentSignIn) relies on DropboxTokenStore's DPAPI
+/// encryption — matches this app's actual deployment target (Sifra.Desktop
+/// is a WPF app, net10.0-windows already).
 /// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class DropboxAuthProvider : ICloudAuthProvider
 {
     private const int RedirectPort = 52475;
     private static readonly Uri RedirectUri = new($"http://localhost:{RedirectPort}/");
 
     private readonly string _appKey;
+    private readonly DropboxTokenStore _tokenStore;
 
-    public DropboxAuthProvider(string appKey)
+    private string? _refreshToken;
+    private DateTime _accessTokenExpiresAtUtc = DateTime.MinValue;
+
+    public DropboxAuthProvider(string appKey, DropboxTokenStore? tokenStore = null)
     {
         _appKey = appKey;
+        _tokenStore = tokenStore ?? new DropboxTokenStore();
     }
 
     public bool IsAuthenticated { get; private set; }
@@ -49,7 +59,10 @@ public sealed class DropboxAuthProvider : ICloudAuthProvider
                 clientId: _appKey,
                 redirectUri: RedirectUri,
                 state: state,
-                tokenAccessType: TokenAccessType.Online,
+                // Offline access requests a refresh token alongside the
+                // access token, so TrySilentSignIn can reconnect on a later
+                // app launch without opening a browser again.
+                tokenAccessType: TokenAccessType.Offline,
                 codeChallenge: codeChallenge);
 
             using var listener = new HttpListener();
@@ -81,7 +94,14 @@ public sealed class DropboxAuthProvider : ICloudAuthProvider
                 .GetAwaiter().GetResult();
 
             AccessToken = tokenResult.AccessToken;
+            _refreshToken = tokenResult.RefreshToken;
+            _accessTokenExpiresAtUtc = tokenResult.ExpiresAt ?? DateTime.MinValue;
             IsAuthenticated = true;
+
+            if (!string.IsNullOrEmpty(_refreshToken))
+            {
+                _tokenStore.SaveRefreshToken(_refreshToken);
+            }
         }
         catch (Exception ex)
         {
@@ -89,10 +109,79 @@ public sealed class DropboxAuthProvider : ICloudAuthProvider
         }
     }
 
+    /// <summary>
+    /// Attempts to reconnect using a previously-saved refresh token,
+    /// without opening a browser. Validates the token with one cheap API
+    /// call (also forcing an immediate token refresh, since the access
+    /// token here is deliberately treated as already-expired) so a
+    /// revoked/invalid stored token is detected immediately rather than
+    /// surfacing as a confusing failure on the first real sync.
+    /// </summary>
+    /// <returns>True if reconnected; false if there's no stored token, or it's no longer valid (caller should fall back to interactive SignIn).</returns>
+    public bool TrySilentSignIn()
+    {
+        if (IsAuthenticated)
+        {
+            return true;
+        }
+
+        var refreshToken = _tokenStore.LoadRefreshToken();
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            return false;
+        }
+
+        _refreshToken = refreshToken;
+        AccessToken = string.Empty;
+        _accessTokenExpiresAtUtc = DateTime.MinValue; // already-expired -> forces an immediate refresh below
+
+        try
+        {
+            // Not CreateClient() — it requires IsAuthenticated, which is
+            // exactly what this method is still in the middle of
+            // establishing. BuildClient bypasses that guard intentionally.
+            using var client = BuildClient(TimeSpan.FromSeconds(15));
+            client.Users.GetCurrentAccountAsync().GetAwaiter().GetResult();
+            IsAuthenticated = true;
+            return true;
+        }
+        catch (Exception)
+        {
+            _refreshToken = null;
+            AccessToken = null;
+            IsAuthenticated = false;
+            return false;
+        }
+    }
+
+    /// <summary>Builds a DropboxClient using this provider's current tokens — auto-refreshes internally (via the SDK) whenever a refresh token is present and the access token has expired.</summary>
+    /// <exception cref="InvalidOperationException">Not signed in.</exception>
+    public DropboxClient CreateClient(TimeSpan? timeout = null)
+    {
+        if (!IsAuthenticated)
+        {
+            throw new InvalidOperationException("Not signed in to Dropbox.");
+        }
+
+        return BuildClient(timeout);
+    }
+
+    private DropboxClient BuildClient(TimeSpan? timeout)
+    {
+        var config = new DropboxClientConfig("Sifra") { HttpClient = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(30) } };
+
+        return !string.IsNullOrEmpty(_refreshToken)
+            ? new DropboxClient(AccessToken ?? string.Empty, _refreshToken, _accessTokenExpiresAtUtc, _appKey, config)
+            : new DropboxClient(AccessToken!, config);
+    }
+
     public void SignOut()
     {
         AccessToken = null;
+        _refreshToken = null;
+        _accessTokenExpiresAtUtc = DateTime.MinValue;
         IsAuthenticated = false;
+        _tokenStore.Clear();
     }
 
     private static void OpenBrowser(string url)

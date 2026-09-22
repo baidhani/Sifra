@@ -18,17 +18,27 @@ public sealed class VaultRecoveryService
     private readonly VaultAuthenticator _authenticator;
     private readonly VaultEncryptionService _encryption;
     private readonly AuditLogger? _auditLogger;
+    private readonly VaultIdentityStore? _identityStore;
 
+    /// <param name="identityStore">
+    /// Optional (Phase 3). When provided, every time this device learns
+    /// the vault master key it records that vault's identity fingerprint
+    /// locally — see VaultIdentityStore's remarks. Null means the
+    /// cross-vault sync safety check is simply not available; existing
+    /// callers and tests are unaffected.
+    /// </param>
     public VaultRecoveryService(
         VaultService vaultService,
         VaultAuthenticator authenticator,
         VaultEncryptionService encryption,
-        AuditLogger? auditLogger = null)
+        AuditLogger? auditLogger = null,
+        VaultIdentityStore? identityStore = null)
     {
         _vaultService = vaultService;
         _authenticator = authenticator;
         _encryption = encryption;
         _auditLogger = auditLogger;
+        _identityStore = identityStore;
     }
 
     /// <summary>
@@ -43,6 +53,7 @@ public sealed class VaultRecoveryService
         var vmk = _encryption.DeriveKey(initialMasterPassword, VaultEncryptionService.MasterPasswordSlot);
         _encryption.AddSlot(VaultEncryptionService.RecoveryKeySlot, recoveryKeyPlaintext, vmk);
         _authenticator.SetCredential(initialMasterPassword);
+        _identityStore?.SaveVaultId(VaultEncryptionService.ComputeVaultId(vmk));
     }
 
     /// <exception cref="InvalidRecoveryKeyException">The recovery key does not match this vault.</exception>
@@ -72,6 +83,7 @@ public sealed class VaultRecoveryService
 
         _authenticator.SetCredential(newMasterPassword);
         _vaultService.ConsumeRecoveryKey();
+        _identityStore?.SaveVaultId(VaultEncryptionService.ComputeVaultId(vmk));
 
         // Never log the recovery key or new password — only that recovery succeeded.
         _auditLogger?.Log(nameof(Recover), Environment.UserName, details: "outcome=success");

@@ -1,0 +1,72 @@
+<ui:FluentWindow x:Class="Sifra.Desktop.GeneratorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        mc:Ignorable="d"
+        Title="Generate Password" Height="520" Width="440" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
+        Background="{DynamicResource Sifra.WindowBrush}">
+    <Grid Background="{DynamicResource Sifra.WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Generate Password" Background="{DynamicResource Sifra.WindowBrush}"
+                     ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Margin="24,16,24,0">
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <ui:TextBox x:Name="PasswordText" Grid.Column="0" IsReadOnly="True" FontFamily="Consolas" FontSize="16"/>
+                <ui:Button Grid.Column="2" Icon="{ui:SymbolIcon ArrowSync24}" Click="OnRegenerateClick" ToolTip="Generate a new one"/>
+            </Grid>
+
+            <Grid Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Height="4" CornerRadius="2" x:Name="Segment1"/>
+                <Border Grid.Column="1" Height="4" CornerRadius="2" Margin="3,0,0,0" x:Name="Segment2"/>
+                <Border Grid.Column="2" Height="4" CornerRadius="2" Margin="3,0,0,0" x:Name="Segment3"/>
+                <Border Grid.Column="3" Height="4" CornerRadius="2" Margin="3,0,0,0" x:Name="Segment4"/>
+            </Grid>
+            <ui:TextBlock x:Name="CrackTimeText" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}"
+                          HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+            <Slider x:Name="LengthSlider" Minimum="4" Maximum="64" TickFrequency="1" IsSnapToTickEnabled="True"
+                    ValueChanged="OnLengthSliderChanged" Margin="0,0,0,6"/>
+            <ui:TextBlock x:Name="LengthText" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+            <ui:Button Content="Options..." Icon="{ui:SymbolIcon Settings24}" Appearance="Transparent"
+                       HorizontalAlignment="Right" Margin="0,0,0,8" Click="OnOptionsClick" ToolTip="Password Options"/>
+
+            <RadioButton x:Name="MemorableRadio" GroupName="GeneratorMode" Content="Memorable" Margin="0,0,0,10" Checked="OnModeChanged"/>
+            <RadioButton x:Name="LettersAndNumbersRadio" GroupName="GeneratorMode" Content="Letters and numbers" Margin="0,0,0,10" Checked="OnModeChanged"/>
+            <RadioButton x:Name="RandomRadio" GroupName="GeneratorMode" Content="Random" IsChecked="True" Margin="0,0,0,10" Checked="OnModeChanged"/>
+            <RadioButton x:Name="NumbersOnlyRadio" GroupName="GeneratorMode" Content="Numbers only" Margin="0,0,0,10" Checked="OnModeChanged"/>
+
+            <ui:TextBlock x:Name="ErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="24,0,24,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ui:Button Grid.Column="0" Content="Copy" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnCopyClick"/>
+            <ui:Button Grid.Column="2" Content="Cancel" HorizontalAlignment="Stretch" Click="OnCancelClick"/>
+        </Grid>
+    </Grid>
+</ui:FluentWindow>

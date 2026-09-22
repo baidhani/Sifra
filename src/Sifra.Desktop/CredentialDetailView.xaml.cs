@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -37,8 +38,91 @@ public partial class CredentialDetailView : UserControl
     private readonly string _vaultCredential;
     private readonly DispatcherTimer _otpTimer;
     private CredentialView? _current;
+    private string _searchQuery = string.Empty;
 
     public event EventHandler? Changed;
+
+    /// <summary>
+    /// Set by VaultView right after construction — the Lock guard's real
+    /// logic (session-unlock tracking, the master-password prompt) lives
+    /// there, since it's shared with the toolbar/context-menu paths. Takes
+    /// (id, label, isLocked), returns whether modification may proceed.
+    /// Null means "no guard wired up" (e.g. an isolated test), which
+    /// allows everything rather than silently blocking.
+    /// </summary>
+    public Func<string, string, bool, bool>? EnsureUnlockedForModification { get; set; }
+
+    /// <summary>
+    /// Set by VaultView right after construction — reports whether the given
+    /// credential id is currently session-unlocked, so Render() can pick the
+    /// open- vs closed-padlock glyph next to the title. Null (e.g. an
+    /// isolated test) is treated as "never session-unlocked".
+    /// </summary>
+    public Func<string, bool>? IsSessionUnlocked { get; set; }
+
+    /// <summary>
+    /// Set by VaultView as the search box changes, so whichever credential
+    /// is currently shown re-highlights live — mirrors CredentialRow's
+    /// SearchQuery for the list, but applied via TextBlock.Inlines here
+    /// since these fields are built in code, not data-bound.
+    /// </summary>
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (_searchQuery == value)
+            {
+                return;
+            }
+            _searchQuery = value;
+            if (_current is not null)
+            {
+                Render();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Splits text into runs, highlighting whichever ones match SearchQuery
+    /// — the detail-pane equivalent of CredentialRow.BuildSegments, just
+    /// applied directly to Inlines since this view builds its fields in
+    /// code rather than through data-bound templates.
+    /// </summary>
+    private void SetHighlightedText(TextBlock block, string text)
+    {
+        block.Inlines.Clear();
+        if (_searchQuery.Length == 0 || text.Length == 0)
+        {
+            block.Inlines.Add(new Run(text));
+            return;
+        }
+
+        var index = 0;
+        while (index < text.Length)
+        {
+            var matchIndex = text.IndexOf(_searchQuery, index, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                block.Inlines.Add(new Run(text[index..]));
+                break;
+            }
+
+            if (matchIndex > index)
+            {
+                block.Inlines.Add(new Run(text[index..matchIndex]));
+            }
+            block.Inlines.Add(new Run(text.Substring(matchIndex, _searchQuery.Length)) { Background = SearchHighlightBrush });
+            index = matchIndex + _searchQuery.Length;
+        }
+    }
+
+    // Same semi-transparent amber as VaultView's list-row highlight
+    // (SearchHighlightSegment style) — kept as one literal here rather
+    // than a shared resource since this is set imperatively on a Run, not
+    // through XAML/DynamicResource.
+    private static readonly System.Windows.Media.Brush SearchHighlightBrush =
+        new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(0x66, 0xFF, 0xD5, 0x4F));
 
     public CredentialDetailView(AppServices services, string vaultCredential)
     {
@@ -74,7 +158,17 @@ public partial class CredentialDetailView : UserControl
         if (c is null) return;
 
         RenderAvatar(c);
-        TitleText.Text = c.Label;
+        SetHighlightedText(TitleText, c.Label);
+
+        LockIcon.Visibility = c.IsLocked ? Visibility.Visible : Visibility.Collapsed;
+        if (c.IsLocked)
+        {
+            var sessionUnlocked = IsSessionUnlocked?.Invoke(c.Id) ?? false;
+            LockIcon.Symbol = sessionUnlocked
+                ? Wpf.Ui.Controls.SymbolRegular.LockOpen24
+                : Wpf.Ui.Controls.SymbolRegular.LockClosed24;
+        }
+
         HealthText.Text = $"Updated {c.UpdatedAtUtc:g}";
         UpdatedText.Text = $"Modified: {c.UpdatedAtUtc:g}";
         CreatedText.Text = $"Created: {c.CreatedAtUtc:g}";
@@ -107,7 +201,7 @@ public partial class CredentialDetailView : UserControl
         var notesField = c.Fields.FirstOrDefault(f => string.Equals(f.Name, "Notes", StringComparison.OrdinalIgnoreCase));
         var hasNotes = notesField is { Value.Length: > 0 };
         NotesPanel.Visibility = hasNotes ? Visibility.Visible : Visibility.Collapsed;
-        NotesText.Text = notesField?.Value;
+        SetHighlightedText(NotesText, notesField?.Value ?? string.Empty);
 
         // An empty field is just noise — nothing to reveal, copy, or act on
         // — so it's hidden here entirely rather than shown blank, and (see
@@ -194,14 +288,14 @@ public partial class CredentialDetailView : UserControl
         var websiteUrl = _current.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Website)?.Value;
         if (string.IsNullOrWhiteSpace(websiteUrl))
         {
-            MessageBox.Show(Window.GetWindow(this), "This credential has no Website field to fetch an icon from.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Information);
+            ThemedMessageBox.Show(Window.GetWindow(this), "This credential has no Website field to fetch an icon from.", "Sifra");
             return;
         }
 
         var found = await _services.CredentialIcons.SetFromWebsiteAsync(_current.Id, websiteUrl, CancellationToken.None);
         if (!found)
         {
-            MessageBox.Show(Window.GetWindow(this), "Could not find an icon for this website.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not find an icon for this website.", "Sifra", ThemedMessageBox.Icon.Warning);
             return;
         }
 
@@ -259,7 +353,7 @@ public partial class CredentialDetailView : UserControl
         catch (IOException)
         {
             // Failure path: an unreadable source file (deleted/locked between picking it and reading it) must not crash the app.
-            MessageBox.Show(Window.GetWindow(this), "Could not read that file.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not read that file.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
@@ -350,7 +444,7 @@ public partial class CredentialDetailView : UserControl
         catch (IOException)
         {
             // Failure path: destination locked/unwritable must not crash the app.
-            MessageBox.Show(Window.GetWindow(this), "Could not save this attachment.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not save this attachment.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
@@ -414,11 +508,11 @@ public partial class CredentialDetailView : UserControl
             // Owning both states directly guarantees a visible color change.
             var link = new TextBlock
             {
-                Text = field.Value,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextDecorations = TextDecorations.Underline,
                 Cursor = System.Windows.Input.Cursors.Hand,
             };
+            SetHighlightedText(link, field.Value);
             link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkBrush");
             link.MouseEnter += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkHoverBrush");
             link.MouseLeave += (_, _) => link.SetResourceReference(TextBlock.ForegroundProperty, "Sifra.LinkBrush");
@@ -432,7 +526,6 @@ public partial class CredentialDetailView : UserControl
         var isSensitive = field.Type is CustomFieldType.Password or CustomFieldType.Pin or CustomFieldType.Secret;
         var valueText = new Wpf.Ui.Controls.TextBlock
         {
-            Text = isSensitive ? new string('•', 8) : field.Value,
             FontFamily = new System.Windows.Media.FontFamily("Consolas"),
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -442,13 +535,27 @@ public partial class CredentialDetailView : UserControl
 
         if (isSensitive)
         {
+            // Masked by default, so nothing to highlight until revealed —
+            // highlighting bullet characters would be meaningless.
+            valueText.Inlines.Add(new Run(new string('•', 8)));
             var revealed = false;
-            valueText.Text = new string('•', 8);
             AddButtonColumn(row, "Eye24", "Show/hide", () =>
             {
                 revealed = !revealed;
-                valueText.Text = revealed ? field.Value : new string('•', 8);
+                if (revealed)
+                {
+                    SetHighlightedText(valueText, field.Value);
+                }
+                else
+                {
+                    valueText.Inlines.Clear();
+                    valueText.Inlines.Add(new Run(new string('•', 8)));
+                }
             });
+        }
+        else
+        {
+            SetHighlightedText(valueText, field.Value);
         }
 
         AddButtonColumn(row, "Copy24", "Copy value", () => CopyToClipboard(field.Value));
@@ -544,7 +651,7 @@ public partial class CredentialDetailView : UserControl
         catch (System.Runtime.InteropServices.COMException)
         {
             // Failure path: another process briefly holding the clipboard must not crash the app.
-            MessageBox.Show(Window.GetWindow(this), "Could not copy to the clipboard.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not copy to the clipboard.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
@@ -557,7 +664,7 @@ public partial class CredentialDetailView : UserControl
         catch (System.ComponentModel.Win32Exception)
         {
             // Failure path: an unreachable/invalid URL must not crash the app.
-            MessageBox.Show(Window.GetWindow(this), "Could not open this URL.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not open this URL.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
@@ -595,15 +702,18 @@ public partial class CredentialDetailView : UserControl
 
     private void OnFavoriteClick(object sender, RoutedEventArgs e)
     {
-        if (_current is null) return;
+        if (_current is null || !IsUnlockedForModification()) return;
         _services.Credentials.SetFavorite(_current.Id, !_current.IsFavorite);
         ShowCredential(_current.Id);
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
+    private bool IsUnlockedForModification() =>
+        _current is null || (EnsureUnlockedForModification?.Invoke(_current.Id, _current.Label, _current.IsLocked) ?? true);
+
     private void OnEditClick(object sender, RoutedEventArgs e)
     {
-        if (_current is null) return;
+        if (_current is null || !IsUnlockedForModification()) return;
 
         var window = new AddCredentialWindow(_services, _vaultCredential, _current)
         {
@@ -619,7 +729,7 @@ public partial class CredentialDetailView : UserControl
 
     private void OnSetTagsClick(object sender, RoutedEventArgs e)
     {
-        if (_current is null) return;
+        if (_current is null || !IsUnlockedForModification()) return;
 
         var window = new SetTagsWindow(_services.Tags, _current.Tags ?? Array.Empty<string>())
         {

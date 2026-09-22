@@ -62,8 +62,8 @@ public sealed class CredentialStore
             {
                 cmd.Transaction = transaction;
                 cmd.CommandText = exists
-                    ? "UPDATE credentials SET label=$label, updated_at=$updated, created_at=$created, is_favorite=$fav, icon_kind=$iconKind, icon_symbol_name=$iconSymbol, icon_background_color_hex=$iconColor WHERE id=$id"
-                    : "INSERT INTO credentials (id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex) VALUES ($id, $label, $updated, $created, $fav, $iconKind, $iconSymbol, $iconColor)";
+                    ? "UPDATE credentials SET label=$label, updated_at=$updated, created_at=$created, is_favorite=$fav, icon_kind=$iconKind, icon_symbol_name=$iconSymbol, icon_background_color_hex=$iconColor, is_archived=$archived, is_deleted=$deleted, deleted_at=$deletedAt, is_locked=$locked WHERE id=$id"
+                    : "INSERT INTO credentials (id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked) VALUES ($id, $label, $updated, $created, $fav, $iconKind, $iconSymbol, $iconColor, $archived, $deleted, $deletedAt, $locked)";
                 cmd.Parameters.AddWithValue("$id", credential.Id);
                 cmd.Parameters.AddWithValue("$label", credential.Label);
                 cmd.Parameters.AddWithValue("$updated", credential.UpdatedAtUtc.ToString("o"));
@@ -72,6 +72,10 @@ public sealed class CredentialStore
                 cmd.Parameters.AddWithValue("$iconKind", (object?)credential.Icon?.Kind.ToString() ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$iconSymbol", (object?)credential.Icon?.SymbolName ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$iconColor", (object?)credential.Icon?.BackgroundColorHex ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$archived", credential.IsArchived ? 1 : 0);
+                cmd.Parameters.AddWithValue("$deleted", credential.IsDeleted ? 1 : 0);
+                cmd.Parameters.AddWithValue("$deletedAt", (object?)credential.DeletedAtUtc?.ToString("o") ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("$locked", credential.IsLocked ? 1 : 0);
                 cmd.ExecuteNonQuery();
             }
 
@@ -170,7 +174,7 @@ public sealed class CredentialStore
 
         using (var cmd = connection.CreateCommand())
         {
-            cmd.CommandText = "SELECT id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex FROM credentials ORDER BY rowid";
+            cmd.CommandText = "SELECT id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked FROM credentials ORDER BY rowid";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -185,7 +189,11 @@ public sealed class CredentialStore
                 credentials[id] = new Credential(
                     id, reader.GetString(1), new List<CustomField>(),
                     DateTimeOffset.Parse(reader.GetString(2)), DateTimeOffset.Parse(reader.GetString(3)),
-                    IsFavorite: reader.GetInt32(4) == 1, Tags: new List<string>(), Icon: icon);
+                    IsFavorite: reader.GetInt32(4) == 1, Tags: new List<string>(), Icon: icon,
+                    IsArchived: reader.GetInt32(8) == 1,
+                    IsDeleted: reader.GetInt32(9) == 1,
+                    DeletedAtUtc: reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
+                    IsLocked: reader.GetInt32(11) == 1);
                 order.Add(id);
             }
         }
@@ -251,34 +259,64 @@ public sealed class CredentialStore
 
     private static void EnsureSchema(SqliteConnection connection)
     {
-        using var cmd = connection.CreateCommand();
-        cmd.CommandText = """
-            CREATE TABLE IF NOT EXISTS credentials (
-                id TEXT PRIMARY KEY,
-                label TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                is_favorite INTEGER NOT NULL,
-                icon_kind TEXT,
-                icon_symbol_name TEXT,
-                icon_background_color_hex TEXT
-            );
-            CREATE TABLE IF NOT EXISTS credential_fields (
-                credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
-                name TEXT NOT NULL,
-                type TEXT NOT NULL,
-                encrypted_value TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS credential_tags (
-                credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
-                tag TEXT NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS idx_credential_fields_cid ON credential_fields(credential_id);
-            CREATE INDEX IF NOT EXISTS idx_credential_tags_cid ON credential_tags(credential_id);
-            CREATE INDEX IF NOT EXISTS idx_credential_tags_tag ON credential_tags(tag);
-            """;
-        cmd.ExecuteNonQuery();
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS credentials (
+                    id TEXT PRIMARY KEY,
+                    label TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    is_favorite INTEGER NOT NULL,
+                    icon_kind TEXT,
+                    icon_symbol_name TEXT,
+                    icon_background_color_hex TEXT
+                );
+                CREATE TABLE IF NOT EXISTS credential_fields (
+                    credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    encrypted_value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS credential_tags (
+                    credential_id TEXT NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
+                    tag TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_credential_fields_cid ON credential_fields(credential_id);
+                CREATE INDEX IF NOT EXISTS idx_credential_tags_cid ON credential_tags(credential_id);
+                CREATE INDEX IF NOT EXISTS idx_credential_tags_tag ON credential_tags(tag);
+                """;
+            cmd.ExecuteNonQuery();
+        }
+
+        // Added for the Archive/Trash feature — an existing on-disk database
+        // from before this shipped won't have these columns yet, and SQLite
+        // has no "ADD COLUMN IF NOT EXISTS", so check PRAGMA table_info first.
+        AddColumnIfMissing(connection, "credentials", "is_archived", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "credentials", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "credentials", "deleted_at", "TEXT");
+        AddColumnIfMissing(connection, "credentials", "is_locked", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string definition)
+    {
+        using (var checkCmd = connection.CreateCommand())
+        {
+            checkCmd.CommandText = $"PRAGMA table_info({table})";
+            using var reader = checkCmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                {
+                    return; // already present
+                }
+            }
+        }
+
+        using var alterCmd = connection.CreateCommand();
+        alterCmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+        alterCmd.ExecuteNonQuery();
     }
 
     // One-time import from the pre-Phase-3 JSON file. Runs only when the

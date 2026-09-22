@@ -1,6 +1,7 @@
 using Sifra.Vault.Audit;
 using Sifra.Vault.Credentials;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Sync;
 using static Sifra.Vault.Tests.CredentialFieldTestHelpers;
 
 namespace Sifra.Vault.Tests;
@@ -176,6 +177,35 @@ public sealed class CredentialServiceTests : IDisposable
         var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
 
         service.Delete(id);
+
+        Assert.Empty(service.List(VaultCredential));
+    }
+
+    [Fact]
+    public void Delete_WithATombstoneStoreConfigured_RecordsATombstone()
+    {
+        // Phase 3: without a tombstone, a device that synced before this
+        // delete would push its still-locally-present copy back up and
+        // silently resurrect it on its next sync.
+        var tombstones = new CredentialTombstoneStore(_dataDirectory);
+        var service = new CredentialService(
+            new CredentialStore(_dataDirectory), new VaultEncryptionService(new VaultMasterKeyStore(_dataDirectory)),
+            _clipboard, tombstones: tombstones);
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+
+        service.Delete(id);
+
+        Assert.NotNull(tombstones.Load(id));
+    }
+
+    [Fact]
+    public void Delete_WithNoTombstoneStoreConfigured_NeverAttemptsToRecordOne()
+    {
+        // Existing/local-only vaults (the default) must behave exactly as before.
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+
+        service.Delete(id); // must not throw for lack of a tombstone store
 
         Assert.Empty(service.List(VaultCredential));
     }

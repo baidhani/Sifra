@@ -85,7 +85,7 @@ public partial class PasswordHistoryWindow : Wpf.Ui.Controls.FluentWindow
         catch (System.Runtime.InteropServices.COMException)
         {
             // Failure path: another process briefly holding the clipboard must not crash the app.
-            MessageBox.Show(this, "Could not copy to the clipboard.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(this, "Could not copy to the clipboard.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 

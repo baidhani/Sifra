@@ -802,3 +802,13 @@ your repo.
 criterion list in it, you own the `passed` flags and the notes, and a sync keeps your
 side. Everything else — including the docs above — is yours to change.
 <!-- COLABERRY:END -->
+
+## Local test-build versioning
+
+Every time you rebuild `Sifra.Desktop` for the user to test (not every code edit —
+only when a build is actually being handed to them to run), bump the PATCH number
+in `<Version>` in `src/Sifra.Desktop/Sifra.Desktop.csproj` by one (e.g. `0.0.1` →
+`0.0.2`) before running the build. This lets a version shown on the Unlock screen
+map to a specific build the user is looking at, without them having to ask which
+one they're running. Bump only the patch digit; leave major/minor alone unless the
+user says otherwise.

@@ -39,6 +39,15 @@ public sealed class AttachmentStore
         MigrateFromLegacyJsonIfNeeded(connection, directory);
     }
 
+    /// <summary>All attachment metadata in the vault, across every credential — used by sync, which reconciles the whole vault at once.</summary>
+    public IReadOnlyList<CredentialAttachment> GetAll()
+    {
+        using var connection = VaultDatabase.OpenConnection(_dataDirectory);
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT id, credential_id, file_name, kind, size_bytes, created_at FROM attachments ORDER BY rowid";
+        return ReadAttachments(cmd);
+    }
+
     public IReadOnlyList<CredentialAttachment> GetAllForCredential(string credentialId)
     {
         using var connection = VaultDatabase.OpenConnection(_dataDirectory);
@@ -80,6 +89,41 @@ public sealed class AttachmentStore
         WriteBlob(metadata.Id, encryptedBytes);
     }
 
+    /// <summary>
+    /// Inserts or replaces attachment metadata WITHOUT touching the blob
+    /// file — used by sync when pulling in a remote device's attachment
+    /// metadata before its blob bytes have transferred (blob transfer is a
+    /// separate, per-file sync step, not part of the metadata envelope).
+    /// ReadEncryptedBlob will fail for this Id until the blob itself
+    /// arrives, the same as any file that hasn't finished downloading.
+    /// </summary>
+    public void UpsertMetadataOnly(CredentialAttachment metadata)
+    {
+        using var connection = VaultDatabase.OpenConnection(_dataDirectory);
+        try
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = """
+                INSERT INTO attachments (id, credential_id, file_name, kind, size_bytes, created_at)
+                VALUES ($id, $cid, $name, $kind, $size, $created)
+                ON CONFLICT(id) DO UPDATE SET
+                    credential_id=excluded.credential_id, file_name=excluded.file_name,
+                    kind=excluded.kind, size_bytes=excluded.size_bytes, created_at=excluded.created_at
+                """;
+            cmd.Parameters.AddWithValue("$id", metadata.Id);
+            cmd.Parameters.AddWithValue("$cid", metadata.CredentialId);
+            cmd.Parameters.AddWithValue("$name", metadata.FileName);
+            cmd.Parameters.AddWithValue("$kind", metadata.Kind.ToString());
+            cmd.Parameters.AddWithValue("$size", metadata.SizeBytes);
+            cmd.Parameters.AddWithValue("$created", metadata.CreatedAtUtc.ToString("o"));
+            cmd.ExecuteNonQuery();
+        }
+        catch (SqliteException ex)
+        {
+            throw new VaultStorageException("Could not write to the attachments database.", ex);
+        }
+    }
+
     public byte[] ReadEncryptedBlob(string attachmentId)
     {
         var path = BlobPath(attachmentId);
@@ -92,6 +136,17 @@ public sealed class AttachmentStore
             throw new VaultStorageException($"Could not read attachment blob '{path}'.", ex);
         }
     }
+
+    /// <summary>Whether this attachment's blob file exists locally — used by blob sync to decide upload-vs-download without reading the (potentially large) content first.</summary>
+    public bool HasLocalBlob(string attachmentId) => File.Exists(BlobPath(attachmentId));
+
+    /// <summary>
+    /// Writes a blob's bytes WITHOUT touching metadata — used by blob sync
+    /// to save down content pulled from the cloud for metadata that
+    /// already arrived via the envelope (UpsertMetadataOnly) but whose
+    /// content hadn't transferred yet.
+    /// </summary>
+    public void SaveEncryptedBlob(string attachmentId, byte[] encryptedBytes) => WriteBlob(attachmentId, encryptedBytes);
 
     public void Delete(string attachmentId)
     {

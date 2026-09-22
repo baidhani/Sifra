@@ -1,5 +1,6 @@
 using Sifra.Vault.Audit;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Sync;
 
 namespace Sifra.Vault.Attachments;
 
@@ -15,12 +16,24 @@ public sealed class CredentialAttachmentService
     private readonly AttachmentStore _store;
     private readonly VaultEncryptionService _encryption;
     private readonly AuditLogger? _auditLogger;
+    private readonly AttachmentTombstoneStore? _tombstones;
 
-    public CredentialAttachmentService(AttachmentStore store, VaultEncryptionService encryption, AuditLogger? auditLogger = null)
+    /// <param name="tombstones">
+    /// Optional (Phase 3). When provided, Delete/DeleteAllForCredential
+    /// record a tombstone instead of just removing the row silently — see
+    /// AttachmentTombstoneStore's remarks. Null means no sync is
+    /// configured; existing callers and tests are unaffected.
+    /// </param>
+    public CredentialAttachmentService(
+        AttachmentStore store,
+        VaultEncryptionService encryption,
+        AuditLogger? auditLogger = null,
+        AttachmentTombstoneStore? tombstones = null)
     {
         _store = store;
         _encryption = encryption;
         _auditLogger = auditLogger;
+        _tombstones = tombstones;
     }
 
     public IReadOnlyList<CredentialAttachment> List(string credentialId) =>
@@ -49,6 +62,7 @@ public sealed class CredentialAttachmentService
 
     public void Delete(string attachmentId)
     {
+        _tombstones?.Add(attachmentId, DateTimeOffset.UtcNow);
         _store.Delete(attachmentId);
         _auditLogger?.Log(nameof(Delete), Environment.UserName, details: $"attachmentId={attachmentId}");
     }
@@ -56,6 +70,15 @@ public sealed class CredentialAttachmentService
     /// <summary>Called alongside CredentialService.Delete so a deleted credential's attachments don't become orphaned files.</summary>
     public void DeleteAllForCredential(string credentialId)
     {
+        if (_tombstones is not null)
+        {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var attachment in _store.GetAllForCredential(credentialId))
+            {
+                _tombstones.Add(attachment.Id, now);
+            }
+        }
+
         _store.DeleteAllForCredential(credentialId);
         _auditLogger?.Log(nameof(DeleteAllForCredential), Environment.UserName, details: $"credentialId={credentialId}");
     }

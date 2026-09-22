@@ -41,5 +41,8 @@
                 </Border>
             </StackPanel>
         </ui:Card>
+
+        <ui:TextBlock x:Name="VersionText" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}"
+                      HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,16"/>
     </Grid>
 </UserControl>

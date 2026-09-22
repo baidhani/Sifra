@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="Options" Height="300" Width="460" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Title="Options" Height="450" Width="460" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
         Background="{DynamicResource Sifra.WindowBrush}">
     <Grid Background="{DynamicResource Sifra.WindowBrush}">
@@ -20,6 +20,15 @@
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="20">
+            <ui:TextBlock Text="Theme" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+            <ui:TextBlock Text="Choose how Sifra looks. System follows Windows' own light/dark setting automatically."
+                          FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <RadioButton x:Name="ThemeSystemRadio" GroupName="Theme" Content="System" IsChecked="True" Margin="0,0,16,0"/>
+                <RadioButton x:Name="ThemeLightRadio" GroupName="Theme" Content="Light" Margin="0,0,16,0"/>
+                <RadioButton x:Name="ThemeDarkRadio" GroupName="Theme" Content="Dark"/>
+            </StackPanel>
+
             <ui:TextBlock Text="Auto-lock" FontTypography="BodyStrong" Margin="0,0,0,6"/>
             <ui:TextBlock Text="Lock the vault automatically after this much inactivity."
                           FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
@@ -28,7 +37,18 @@
             <ui:TextBlock Text="Browser extensions" FontTypography="BodyStrong" Margin="0,0,0,6"/>
             <ui:TextBlock Text="Manage which browsers can access this vault through the Sifra extension."
                           FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
-            <ui:Button Content="Manage Extensions..." HorizontalAlignment="Left" Click="OnManageExtensionsClick"/>
+            <ui:Button Content="Manage Extensions..." HorizontalAlignment="Left" Margin="0,0,0,20" Click="OnManageExtensionsClick"/>
+
+            <ui:TextBlock Text="Cloud sync" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+            <ui:TextBlock x:Name="SyncProviderStatusText" FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <ui:Button x:Name="EnableSyncProviderButton" Content="Set up cloud sync..." HorizontalAlignment="Left" Margin="0,0,0,20" Click="OnEnableSyncProviderClick" Visibility="Collapsed"/>
+            <ui:Button x:Name="MigrateSyncProviderButton" Content="Migrate to a different provider..." HorizontalAlignment="Left" Margin="0,0,0,20" Click="OnMigrateSyncProviderClick"/>
+
+            <ui:TextBlock Text="Startup" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+            <ui:TextBlock Text="Closing the window minimizes Sifra to the system tray instead of exiting — background sync keeps running until you Exit from the tray icon."
+                          FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
+            <CheckBox x:Name="StartWithWindowsCheckBox" Content="Start Sifra automatically when Windows starts" Margin="0,0,0,10"/>
+            <CheckBox x:Name="KeepTrayIconVisibleCheckBox" Content="Keep the tray icon visible after restoring the window"/>
         </StackPanel>
         </ScrollViewer>
 

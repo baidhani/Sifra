@@ -1,0 +1,32 @@
+<ui:FluentWindow x:Class="Sifra.Desktop.ThemedMessageBoxWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        mc:Ignorable="d"
+        Width="420" SizeToContent="Height" MinWidth="1" MinHeight="1" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
+        Background="{DynamicResource Sifra.WindowBrush}">
+    <Grid Background="{DynamicResource Sifra.WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+                     Background="{DynamicResource Sifra.WindowBrush}" ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20">
+            <ui:SymbolIcon x:Name="MessageIcon" FontSize="24" VerticalAlignment="Top" Margin="0,2,14,0"/>
+            <ui:TextBlock x:Name="MessageText" FontTypography="Body" TextWrapping="Wrap" MaxWidth="320"
+                          Foreground="{DynamicResource Sifra.TextPrimaryBrush}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">
+            <ui:Button x:Name="SecondaryButton" Margin="0,0,10,0" Click="OnSecondaryClick"/>
+            <ui:Button x:Name="PrimaryButton" Appearance="Primary" Click="OnPrimaryClick"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

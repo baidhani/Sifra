@@ -41,6 +41,20 @@ public sealed class VaultMasterKeyStore
         SaveSlotInternal(connection, slotId, slot);
     }
 
+    /// <summary>
+    /// Removes a slot outright — used to roll back a failed "join existing
+    /// vault" attempt (wrong password) so the device is left exactly as it
+    /// was before the join attempt, rather than with a dangling slot.
+    /// </summary>
+    public void DeleteSlot(string slotId)
+    {
+        using var connection = VaultDatabase.OpenConnection(_dataDirectory);
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM vault_master_key_slots WHERE slot_id = $id";
+        cmd.Parameters.AddWithValue("$id", slotId);
+        cmd.ExecuteNonQuery();
+    }
+
     private static void SaveSlotInternal(SqliteConnection connection, string slotId, VaultMasterKeySlot slot)
     {
         try

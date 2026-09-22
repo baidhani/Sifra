@@ -1,0 +1,39 @@
+<ui:FluentWindow x:Class="Sifra.Desktop.MigrateSyncProviderWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        mc:Ignorable="d"
+        Title="Migrate Sync Provider" Height="380" Width="460" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True" WindowBackdropType="None"
+        Background="{DynamicResource Sifra.WindowBrush}">
+    <Grid Background="{DynamicResource Sifra.WindowBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Migrate Sync Provider" Background="{DynamicResource Sifra.WindowBrush}"
+                     ShowMaximize="False" ShowMinimize="False"/>
+
+        <StackPanel Grid.Row="1" Margin="20">
+            <ui:TextBlock x:Name="CurrentProviderText" FontTypography="BodyStrong" Margin="0,0,0,14" TextWrapping="Wrap"/>
+
+            <ui:TextBlock Text="Migrate to" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+            <StackPanel x:Name="DestinationProviderPanel" Orientation="Horizontal" Margin="0,0,0,16"/>
+
+            <ui:TextBlock Text="This only updates this device. Any other device sharing this vault must also be switched to the new provider afterward, or it will keep syncing to the old one — this app has no way to notify other devices automatically."
+                          TextWrapping="Wrap" FontTypography="Caption" Foreground="{DynamicResource SystemFillColorCautionBrush}" Margin="0,0,0,16"/>
+
+            <ui:TextBlock x:Name="ErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,0,20,20">
+            <ui:ProgressRing x:Name="ProgressRing" IsIndeterminate="True" Width="20" Height="20" Margin="0,0,10,0" Visibility="Collapsed" VerticalAlignment="Center"/>
+            <ui:Button x:Name="MigrateButton" Content="Migrate" Appearance="Primary" Margin="0,0,10,0" Click="OnMigrateClick"/>
+            <ui:Button Content="Cancel" Click="OnCancelClick"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

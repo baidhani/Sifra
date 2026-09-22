@@ -27,10 +27,11 @@ public sealed class CredentialRow : INotifyPropertyChanged
     private string _healthStatus = "Checking...";
     private HealthLevel _healthLevel = HealthLevel.Checking;
 
-    public CredentialRow(CredentialView view, IReadOnlyDictionary<string, string>? tagColors = null, CredentialIconService? iconService = null)
+    public CredentialRow(CredentialView view, IReadOnlyDictionary<string, string>? tagColors = null, CredentialIconService? iconService = null, bool isSessionUnlocked = false)
     {
         Id = view.Id;
         Label = view.Label;
+        IsSessionUnlocked = isSessionUnlocked;
         // Dynamic field model: there is no fixed "the username field" any
         // more, so the list subtitle is the first Login-type field's value
         // if the credential has one (matching CredentialService.CopyUsername's
@@ -41,6 +42,10 @@ public sealed class CredentialRow : INotifyPropertyChanged
             ?? string.Empty;
         UpdatedAtUtc = view.UpdatedAtUtc;
         IsFavorite = view.IsFavorite;
+        IsArchived = view.IsArchived;
+        IsDeleted = view.IsDeleted;
+        DeletedAtUtc = view.DeletedAtUtc;
+        IsLocked = view.IsLocked;
         Tags = view.Tags ?? Array.Empty<string>();
         FieldValues = view.Fields.Select(f => f.Value).ToList();
 
@@ -103,11 +108,75 @@ public sealed class CredentialRow : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Set by VaultView.ApplyFilter to the current search box text — kept
+    /// on the row itself (rather than passed through a converter) so
+    /// LabelSegments/SubtitleSegments can recompute and raise
+    /// PropertyChanged without needing the row rebuilt from CredentialView.
+    /// </summary>
+    private string _searchQuery = string.Empty;
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (_searchQuery == value)
+            {
+                return;
+            }
+            _searchQuery = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(LabelSegments)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SubtitleSegments)));
+        }
+    }
+
+    public IReadOnlyList<TextSegment> LabelSegments => BuildSegments(Label);
+    public IReadOnlyList<TextSegment> SubtitleSegments => BuildSegments(Subtitle);
+
+    /// <summary>Splits text into match/non-match runs against SearchQuery, for the list row's highlight — a single non-match segment when there's no query or no hit.</summary>
+    private IReadOnlyList<TextSegment> BuildSegments(string text)
+    {
+        if (_searchQuery.Length == 0 || text.Length == 0)
+        {
+            return [new TextSegment(text, false)];
+        }
+
+        var segments = new List<TextSegment>();
+        var index = 0;
+        while (index < text.Length)
+        {
+            var matchIndex = text.IndexOf(_searchQuery, index, StringComparison.OrdinalIgnoreCase);
+            if (matchIndex < 0)
+            {
+                segments.Add(new TextSegment(text[index..], false));
+                break;
+            }
+
+            if (matchIndex > index)
+            {
+                segments.Add(new TextSegment(text[index..matchIndex], false));
+            }
+            segments.Add(new TextSegment(text.Substring(matchIndex, _searchQuery.Length), true));
+            index = matchIndex + _searchQuery.Length;
+        }
+
+        return segments.Count > 0 ? segments : [new TextSegment(text, false)];
+    }
+
     public string Id { get; }
     public string Label { get; }
     public string Subtitle { get; }
     public DateTimeOffset UpdatedAtUtc { get; }
     public bool IsFavorite { get; }
+    public bool IsArchived { get; }
+    public bool IsDeleted { get; }
+    public DateTimeOffset? DeletedAtUtc { get; }
+    public bool IsLocked { get; }
+    /// <summary>Whether this session has temporarily unlocked this item (see VaultView._sessionUnlockedIds) — passed in at construction since rows are rebuilt fresh on every Refresh.</summary>
+    public bool IsSessionUnlocked { get; }
+    public Visibility LockVisibility => IsLocked ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>Closed padlock while locked-and-not-session-unlocked; open padlock (still indicating "has a lock, currently open") once session-unlocked.</summary>
+    public Wpf.Ui.Controls.SymbolRegular LockSymbol => IsSessionUnlocked ? Wpf.Ui.Controls.SymbolRegular.LockOpen24 : Wpf.Ui.Controls.SymbolRegular.LockClosed24;
     public IReadOnlyList<string> Tags { get; }
     /// <summary>One chip (name + color) per entry in Tags, same order — for the list row.</summary>
     public IReadOnlyList<TagChipViewModel> TagChips { get; }
@@ -173,3 +242,6 @@ public sealed class CredentialRow : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 }
+
+/// <summary>One run of text for the list row's search-match highlight — IsMatch true means it should render highlighted.</summary>
+public sealed record TextSegment(string Text, bool IsMatch);

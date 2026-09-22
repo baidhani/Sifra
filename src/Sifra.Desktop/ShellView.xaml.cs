@@ -4,6 +4,8 @@ namespace Sifra.Desktop;
 
 public partial class ShellView : UserControl
 {
+    private readonly VaultView _vaultView;
+
     public event EventHandler? LockRequested;
     public event EventHandler? SettingsChanged;
 
@@ -11,9 +13,12 @@ public partial class ShellView : UserControl
     {
         InitializeComponent();
 
-        var vaultView = new VaultView(services, vaultCredential);
-        vaultView.LockRequested += (_, _) => LockRequested?.Invoke(this, EventArgs.Empty);
-        vaultView.SettingsChanged += (_, _) => SettingsChanged?.Invoke(this, EventArgs.Empty);
-        ContentHost.Content = vaultView;
+        _vaultView = new VaultView(services, vaultCredential);
+        _vaultView.LockRequested += (_, _) => LockRequested?.Invoke(this, EventArgs.Empty);
+        _vaultView.SettingsChanged += (_, _) => SettingsChanged?.Invoke(this, EventArgs.Empty);
+        ContentHost.Content = _vaultView;
     }
+
+    /// <summary>See VaultView.StopBackgroundSync's remarks.</summary>
+    public void StopBackgroundSync() => _vaultView.StopBackgroundSync();
 }

@@ -55,4 +55,43 @@ public sealed class CredentialIconService
     public byte[]? GetImage(string credentialId) => _images.Read(credentialId);
 
     public void DeleteAllForCredential(string credentialId) => _images.Delete(credentialId);
+
+    /// <summary>
+    /// Heals credentials whose icon metadata claims an image (WebsiteFavicon
+    /// or Custom) but whose actual image bytes are missing locally — the
+    /// state a device ends up in right after a fresh restore/join, since
+    /// CredentialIconImageStore is local-only, plaintext, decorative UI
+    /// preference storage and was deliberately never wired into
+    /// VaultSyncService/AttachmentBlobSyncService the way credential fields
+    /// and attachments are. Re-fetches the favicon when the credential has
+    /// a Website field (the one case a missing image can be repaired
+    /// automatically); otherwise falls back to the safe default
+    /// (InitialLetter, keeping whatever background color was already set)
+    /// rather than leaving metadata that permanently claims an image exists
+    /// when it never will again (true for Custom, whose original bytes
+    /// cannot be recovered from anywhere).
+    /// </summary>
+    public async Task RepairMissingImagesAsync(string vaultCredential, CancellationToken cancellationToken = default)
+    {
+        foreach (var view in _credentials.List(vaultCredential))
+        {
+            if (view.Icon?.Kind is not (CredentialIconKind.WebsiteFavicon or CredentialIconKind.Custom))
+            {
+                continue;
+            }
+
+            if (_images.Read(view.Id) is not null)
+            {
+                continue; // the image is actually there — nothing to repair
+            }
+
+            var website = view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Website)?.Value;
+            var repaired = !string.IsNullOrWhiteSpace(website) && await SetFromWebsiteAsync(view.Id, website, cancellationToken);
+
+            if (!repaired)
+            {
+                SetColor(view.Id, view.Icon.BackgroundColorHex ?? "#5B8DEF");
+            }
+        }
+    }
 }

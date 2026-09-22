@@ -1,5 +1,6 @@
 using Sifra.Vault.Audit;
 using Sifra.Vault.Crypto;
+using Sifra.Vault.Sync;
 
 namespace Sifra.Vault.Credentials;
 
@@ -26,19 +27,28 @@ public sealed class CredentialService
     private readonly ICredentialClipboard _clipboard;
     private readonly AuditLogger? _auditLogger;
     private readonly PasswordHistoryService? _passwordHistory;
+    private readonly CredentialTombstoneStore? _tombstones;
 
+    /// <param name="tombstones">
+    /// Optional (Phase 3). When provided, Delete records a tombstone
+    /// instead of just removing the row silently — see
+    /// CredentialTombstoneStore's remarks. Null means no sync is
+    /// configured; existing callers and tests are unaffected.
+    /// </param>
     public CredentialService(
         CredentialStore store,
         VaultEncryptionService encryption,
         ICredentialClipboard clipboard,
         AuditLogger? auditLogger = null,
-        PasswordHistoryService? passwordHistory = null)
+        PasswordHistoryService? passwordHistory = null,
+        CredentialTombstoneStore? tombstones = null)
     {
         _store = store;
         _encryption = encryption;
         _clipboard = clipboard;
         _auditLogger = auditLogger;
         _passwordHistory = passwordHistory;
+        _tombstones = tombstones;
     }
 
     /// <summary>Decrypted list view, every field included — see CredentialView's own remarks on why there's no partial-decrypt list any more.</summary>
@@ -118,7 +128,11 @@ public sealed class CredentialService
             existing.CreatedAtUtc,
             IsFavorite: isFavorite,
             Tags: tags,
-            Icon: existing.Icon));
+            Icon: existing.Icon,
+            IsArchived: existing.IsArchived,
+            IsDeleted: existing.IsDeleted,
+            DeletedAtUtc: existing.DeletedAtUtc,
+            IsLocked: existing.IsLocked));
 
         _auditLogger?.Log(nameof(Edit), Environment.UserName, details: $"id={id}");
     }
@@ -150,10 +164,63 @@ public sealed class CredentialService
         _auditLogger?.Log(nameof(SetFavorite), Environment.UserName, details: $"id={id} isFavorite={isFavorite}");
     }
 
+    /// <summary>Toggles IsArchived without needing every other field — same pattern as SetFavorite.</summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void SetArchived(string id, bool isArchived)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { IsArchived = isArchived, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(SetArchived), Environment.UserName, details: $"id={id} isArchived={isArchived}");
+    }
+
+    /// <summary>
+    /// Toggles IsLocked without needing every other field — same pattern
+    /// as SetFavorite. This just flips the flag; enforcing what a locked
+    /// item blocks, and the re-authenticate-to-unlock flow, is the Desktop
+    /// UI's job (see Credential's own remarks).
+    /// </summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void SetLocked(string id, bool isLocked)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { IsLocked = isLocked, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(SetLocked), Environment.UserName, details: $"id={id} isLocked={isLocked}");
+    }
+
+    /// <summary>
+    /// Moves a credential to Trash — sets IsDeleted/DeletedAtUtc without
+    /// touching anything else, so it's fully recoverable via Restore. This
+    /// is what the normal Delete action in the UI calls; it does NOT
+    /// remove data or create a sync tombstone (see Delete below for that).
+    /// </summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void SoftDelete(string id)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { IsDeleted = true, DeletedAtUtc = DateTimeOffset.UtcNow, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(SoftDelete), Environment.UserName, details: $"id={id}");
+    }
+
+    /// <summary>Restores a Trash item — the inverse of SoftDelete.</summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void Restore(string id)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { IsDeleted = false, DeletedAtUtc = null, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(Restore), Environment.UserName, details: $"id={id}");
+    }
+
+    /// <summary>
+    /// Permanently destroys a credential — real removal plus a sync
+    /// tombstone, so every device eventually deletes its copy too. Reserved
+    /// for emptying the Trash; the normal in-app Delete action is
+    /// SoftDelete, not this.
+    /// </summary>
     /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
     public void Delete(string id)
     {
         FindOrThrow(id);
+        _tombstones?.Add(id, DateTimeOffset.UtcNow);
         _store.Delete(id);
         _auditLogger?.Log(nameof(Delete), Environment.UserName, details: $"id={id}");
     }
@@ -202,7 +269,11 @@ public sealed class CredentialService
         record.CreatedAtUtc,
         IsFavorite: record.IsFavorite,
         Tags: record.Tags ?? Array.Empty<string>(),
-        Icon: record.Icon);
+        Icon: record.Icon,
+        IsArchived: record.IsArchived,
+        IsDeleted: record.IsDeleted,
+        DeletedAtUtc: record.DeletedAtUtc,
+        IsLocked: record.IsLocked);
 
     /// <summary>
     /// Stamps each field with the current edit time, except a field whose

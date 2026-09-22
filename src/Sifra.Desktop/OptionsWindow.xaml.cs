@@ -35,6 +35,47 @@ public partial class OptionsWindow : FluentWindow
 
         var selectedIndex = Array.FindIndex(AutoLockOptions, o => o.Minutes == current.AutoLockMinutes);
         AutoLockCombo.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 1; // default to 5 minutes if unrecognized
+
+        // The registry Run key IS the source of truth here — see
+        // StartupRegistration's remarks — so this reads it directly rather
+        // than trusting any cached/remembered state.
+        StartWithWindowsCheckBox.IsChecked = StartupRegistration.IsEnabled();
+        KeepTrayIconVisibleCheckBox.IsChecked = current.KeepTrayIconVisibleWhenOpen;
+
+        (current.ThemePreference switch
+        {
+            ThemePreferenceKind.Light => ThemeLightRadio,
+            ThemePreferenceKind.Dark => ThemeDarkRadio,
+            _ => ThemeSystemRadio,
+        }).IsChecked = true;
+
+        RefreshSyncProviderStatus();
+    }
+
+    private void RefreshSyncProviderStatus()
+    {
+        if (_services.ActiveSyncProvider is { } provider)
+        {
+            SyncProviderStatusText.Text = $"This vault syncs via {provider}.";
+            EnableSyncProviderButton.Visibility = Visibility.Collapsed;
+            MigrateSyncProviderButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SyncProviderStatusText.Text = "This vault is not syncing to any cloud provider.";
+            EnableSyncProviderButton.Visibility = Visibility.Visible;
+            MigrateSyncProviderButton.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnEnableSyncProviderClick(object sender, RoutedEventArgs e)
+    {
+        var window = new EnableSyncProviderWindow(_services) { Owner = this };
+        if (window.ShowDialog() == true)
+        {
+            RefreshSyncProviderStatus();
+            ThemedMessageBox.Show(this, "Cloud sync is enabled for this vault.", "Sifra");
+        }
     }
 
     private void OnManageExtensionsClick(object sender, RoutedEventArgs e)
@@ -43,12 +84,50 @@ public partial class OptionsWindow : FluentWindow
         window.ShowDialog();
     }
 
+    private void OnMigrateSyncProviderClick(object sender, RoutedEventArgs e)
+    {
+        var window = new MigrateSyncProviderWindow(_services) { Owner = this };
+        if (window.ShowDialog() == true)
+        {
+            RefreshSyncProviderStatus();
+        }
+    }
+
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
         var selected = (ComboBoxItem)AutoLockCombo.SelectedItem;
         var minutes = (int?)selected.Tag;
+        var themePreference = ThemeLightRadio.IsChecked == true ? ThemePreferenceKind.Light
+            : ThemeDarkRadio.IsChecked == true ? ThemePreferenceKind.Dark
+            : ThemePreferenceKind.System;
 
-        _services.Settings.Save(new AppSettings(AutoLockMinutes: minutes));
+        // `with`, not `new AppSettings(...)` — the latter would silently
+        // reset every other field (CloudSyncProvider, ...) back to its
+        // default on every single Options save.
+        _services.Settings.Save(_services.Settings.Get() with
+        {
+            AutoLockMinutes = minutes,
+            KeepTrayIconVisibleWhenOpen = KeepTrayIconVisibleCheckBox.IsChecked == true,
+            ThemePreference = themePreference,
+        });
+
+        // Applied immediately, not just on next launch.
+        ThemeManager.Apply(themePreference switch
+        {
+            ThemePreferenceKind.Light => AppTheme.Light,
+            ThemePreferenceKind.Dark => AppTheme.Dark,
+            _ => AppTheme.System,
+        });
+
+        if (StartWithWindowsCheckBox.IsChecked == true)
+        {
+            StartupRegistration.Enable();
+        }
+        else
+        {
+            StartupRegistration.Disable();
+        }
+
         SettingsChanged?.Invoke(this, EventArgs.Empty);
         DialogResult = true;
     }

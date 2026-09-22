@@ -18,6 +18,9 @@ public partial class UnlockView : UserControl
     {
         InitializeComponent();
         _services = services;
+
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText.Text = version is null ? string.Empty : $"v{version.Major}.{version.Minor}.{version.Build}";
     }
 
     public void SetPairingNoticeVisible(bool visible)

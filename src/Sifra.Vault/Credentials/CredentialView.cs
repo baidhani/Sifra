@@ -15,4 +15,8 @@ public sealed record CredentialView(
     DateTimeOffset CreatedAtUtc,
     bool IsFavorite = false,
     IReadOnlyList<string>? Tags = null,
-    CredentialIcon? Icon = null);
+    CredentialIcon? Icon = null,
+    bool IsArchived = false,
+    bool IsDeleted = false,
+    DateTimeOffset? DeletedAtUtc = null,
+    bool IsLocked = false);

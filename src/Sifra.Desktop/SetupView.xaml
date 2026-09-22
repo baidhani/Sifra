@@ -7,17 +7,103 @@
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
-        <ui:Card x:Name="IntroPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
+        <!-- Step 1: which kind of setup. Kept as its own screen (rather than
+             folded into the Create panel like before) so each path only
+             ever shows the fields that path actually needs — the old
+             single-screen layout clipped content by cramming every path's
+             fields into one card regardless of which one the user wanted. -->
+        <ui:Card x:Name="ChoicePanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+                <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                <ui:TextBlock Text="Vault Setup" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <ui:TextBlock Text="This is the first time Sifra has run on this device. How would you like to set up your vault?" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,24"/>
+
+                <RadioButton x:Name="CreateNewOption" GroupName="SetupChoice" IsChecked="True" Margin="0,0,0,12">
+                    <TextBlock Text="Create a new vault and set a master password for it" TextWrapping="Wrap"/>
+                </RadioButton>
+                <RadioButton x:Name="RestoreCloudOption" GroupName="SetupChoice" Margin="0,0,0,12">
+                    <TextBlock Text="Restore vault from a cloud" TextWrapping="Wrap"/>
+                </RadioButton>
+                <RadioButton x:Name="RestoreFileOption" GroupName="SetupChoice" Margin="0,0,0,20">
+                    <TextBlock Text="Restore vault from a local backup file" TextWrapping="Wrap"/>
+                </RadioButton>
+
+                <ui:Button x:Name="ChoiceNextButton" Content="Next" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnChoiceNextClick"/>
+                <ui:TextBlock x:Name="ChoiceErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ui:Card>
+
+        <!-- Step 2a: Create a new vault. -->
+        <ui:Card x:Name="CreatePanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Create your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                <ui:TextBlock Text="This is the first time Sifra has run on this device. Choose a master password to protect your vault." TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
+                <ui:TextBlock Text="Choose a master password to protect your vault. Cloud sync can be set up later from Options." TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
 
                 <ui:TextBlock Text="Master password" FontTypography="BodyStrong" Margin="0,0,0,6"/>
-                <ui:PasswordBox x:Name="MasterPasswordBox" PasswordChar="&#9679;" PlaceholderText="Enter a master password" Margin="0,0,0,20" KeyDown="OnPasswordBoxKeyDown"/>
+                <ui:PasswordBox x:Name="MasterPasswordBox" PasswordChar="&#9679;" PlaceholderText="Enter a master password" Margin="0,0,0,20" KeyDown="OnCreatePasswordBoxKeyDown"/>
 
-                <ui:Button x:Name="CreateVaultButton" Content="Create Vault" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnCreateVaultClick"/>
-                <ui:TextBlock x:Name="ErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:Button Grid.Column="0" Content="Back" HorizontalAlignment="Stretch" Click="OnBackToChoiceClick"/>
+                    <ui:Button x:Name="CreateVaultButton" Grid.Column="2" Content="Create Vault" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnCreateVaultClick"/>
+                </Grid>
+                <ui:TextBlock x:Name="CreateErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ui:Card>
+
+        <!-- Step 2b: Restore from cloud — pick which provider account holds the vault. -->
+        <ui:Card x:Name="CloudProviderPanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+                <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                <ui:TextBlock Text="Restore from cloud" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <ui:TextBlock Text="Which cloud account holds your vault?" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,16"/>
+
+                <RadioButton x:Name="RestoreDropboxRadio" GroupName="RestoreProvider" Content="Dropbox" IsChecked="True" Margin="0,0,0,8"/>
+                <RadioButton x:Name="RestoreGoogleDriveRadio" GroupName="RestoreProvider" Content="Google Drive" Margin="0,0,0,8"/>
+                <RadioButton x:Name="RestorePCloudRadio" GroupName="RestoreProvider" Content="pCloud" Margin="0,0,0,20"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:Button Grid.Column="0" Content="Back" HorizontalAlignment="Stretch" Click="OnBackToChoiceClick"/>
+                    <ui:Button Grid.Column="2" Content="Next" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnCloudProviderNextClick"/>
+                </Grid>
+                <ui:TextBlock x:Name="CloudProviderErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,12,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ui:Card>
+
+        <!-- Step 3b: Restore from cloud — sign in + master password. -->
+        <ui:Card x:Name="CloudRestorePanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+                <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
+                <ui:TextBlock Text="Restore your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                <ui:TextBlock x:Name="CloudRestoreDescriptionText" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
+
+                <ui:TextBlock Text="Master password" FontTypography="BodyStrong" Margin="0,0,0,6"/>
+                <ui:PasswordBox x:Name="RestoreMasterPasswordBox" PasswordChar="&#9679;" PlaceholderText="Enter this vault's master password" Margin="0,0,0,20" KeyDown="OnRestorePasswordBoxKeyDown"/>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <ui:Button x:Name="CloudRestoreBackButton" Grid.Column="0" Content="Back" HorizontalAlignment="Stretch" Click="OnBackToCloudProviderClick"/>
+                    <ui:Button x:Name="RestoreButton" Grid.Column="2" Content="Restore" Appearance="Primary" HorizontalAlignment="Stretch" Click="OnRestoreClick"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                    <ui:ProgressRing x:Name="RestoreProgressRing" IsIndeterminate="True" Width="16" Height="16" Margin="0,0,8,0" Visibility="Collapsed"/>
+                    <ui:TextBlock x:Name="RestoreStatusText" FontTypography="Caption" Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                </StackPanel>
+                <ui:TextBlock x:Name="CloudRestoreErrorText" Foreground="{DynamicResource SystemFillColorCriticalBrush}" Margin="0,4,0,0" TextWrapping="Wrap"/>
             </StackPanel>
         </ui:Card>
 
@@ -25,7 +111,7 @@
                  VerticalContentAlignment="Top" Padding="32" BorderThickness="0">
             <StackPanel HorizontalAlignment="Center" Margin="0,24,0,0" Width="396">
                 <Image Source="Assets/Brand/sifra_vault_created.png" Width="128" Height="128" Margin="0,0,0,20" HorizontalAlignment="Center"/>
-                <ui:TextBlock Text="Vault created" FontTypography="Subtitle" Foreground="{DynamicResource SystemFillColorSuccessBrush}" Margin="0,0,0,8"/>
+                <ui:TextBlock x:Name="RecoveryTitleText" Text="Vault created" FontTypography="Subtitle" Foreground="{DynamicResource SystemFillColorSuccessBrush}" Margin="0,0,0,8"/>
                 <ui:TextBlock Text="Your recovery key (shown once — save it somewhere safe now):" TextWrapping="Wrap" FontTypography="Body" Margin="0,0,0,10"/>
                 <ui:TextBox x:Name="RecoveryKeyText" IsReadOnly="True" FontFamily="Consolas" FontSize="16" Margin="0,0,0,24"/>
                 <Grid UseLayoutRounding="True" SnapsToDevicePixels="True">

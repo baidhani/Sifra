@@ -17,7 +17,27 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <ui:TitleBar x:Name="AppTitleBar" Grid.Row="0" Title="Sifra" ShowMaximize="True" ShowMinimize="True"/>
+        <ui:TitleBar x:Name="AppTitleBar" Grid.Row="0" ShowMaximize="True" ShowMinimize="True">
+            <ui:TitleBar.Header>
+                <!-- Icon + title built as one tight left-aligned group via
+                     Header, instead of the separate Icon/Title properties —
+                     those default to a wide fixed icon column that left a
+                     large gap before the title text. -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <!-- Extracted from Sifra-TrayIcon-v2.0.ico (transparent
+                         background, no dark tile behind it) rather than
+                         sifra_app_icon_32.png, whose near-black #081A33 fill
+                         reads as solid black at title-bar size on either
+                         theme — this one shows the blue keyhole mark
+                         directly against whatever the title bar's own
+                         background is, light or dark. -->
+                    <Image Source="Assets/Brand/sifra_titlebar_icon_32.png" Width="20" Height="20" VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Sifra" Margin="8,0,0,0" VerticalAlignment="Center"
+                               FontSize="12" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                </StackPanel>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
 
         <Grid Grid.Row="1" x:Name="RootGrid" Background="{DynamicResource Sifra.WindowBrush}">
 

@@ -80,6 +80,16 @@ public sealed class VaultEncryptionService
         AddSlot(slotId, newVaultCredential, vmk);
     }
 
+    /// <summary>
+    /// Reads a slot's current wrapped form — used by callers that need to
+    /// republish it elsewhere (e.g. the cloud key-slot store, after a
+    /// password change re-wraps it) without needing their own reference to
+    /// the underlying VaultMasterKeyStore.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No such slot exists.</exception>
+    public VaultMasterKeySlot GetSlotOrThrow(string slotId) =>
+        _masterKeyStore.LoadSlot(slotId) ?? throw new InvalidOperationException($"No key slot '{slotId}' exists for this vault.");
+
     public string Encrypt(string plaintext, byte[] key) => AesGcmCipher.Encrypt(plaintext, key);
 
     /// <exception cref="VaultDecryptionFailedException">
@@ -105,4 +115,16 @@ public sealed class VaultEncryptionService
 
     private static byte[] DeriveKek(string vaultCredential, byte[] salt) =>
         Rfc2898DeriveBytes.Pbkdf2(vaultCredential, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, KeyLengthBytes);
+
+    /// <summary>
+    /// A non-secret, one-way fingerprint of the vault master key — every
+    /// device that unwraps the SAME VMK computes the SAME fingerprint,
+    /// with no synchronization needed, since it's a pure function of a
+    /// value they already all share. Used to let VaultSyncService detect
+    /// "this cloud file belongs to a different vault" before merging its
+    /// contents in (see VaultIdentityStore/VaultMismatchException). SHA-256
+    /// is a one-way function — this reveals nothing about the VMK itself.
+    /// </summary>
+    public static string ComputeVaultId(byte[] vaultMasterKey) =>
+        Convert.ToHexString(SHA256.HashData(vaultMasterKey));
 }

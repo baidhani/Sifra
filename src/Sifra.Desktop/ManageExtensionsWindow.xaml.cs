@@ -82,14 +82,12 @@ public partial class ManageExtensionsWindow : FluentWindow
 
     private void OnRevokeDeviceClick(DeviceRecord device)
     {
-        var result = System.Windows.MessageBox.Show(
+        var confirmed = ThemedMessageBox.ShowConfirm(
             this,
             $"Revoke \"{device.DeviceName}\"? It will immediately lose access to this vault.",
-            "Sifra",
-            System.Windows.MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+            "Sifra");
 
-        if (result != System.Windows.MessageBoxResult.Yes)
+        if (!confirmed)
         {
             return;
         }

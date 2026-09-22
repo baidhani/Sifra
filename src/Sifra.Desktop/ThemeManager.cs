@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 namespace Sifra.Desktop;
@@ -100,5 +101,70 @@ public static class ThemeManager
             dictionaries.Remove(bridge);
             dictionaries.Add(bridge);
         }
+
+        RefreshWpfUiBridgeKeys();
+    }
+
+    /// <summary>
+    /// Sifra.WpfUiBridge.xaml's brushes are declared as e.g.
+    /// Color="{DynamicResource Sifra.Theme.Input}" — a DynamicResource
+    /// nested INSIDE another dictionary's resource, referencing a key that
+    /// lives in the dictionary just swapped above. That cross-dictionary
+    /// nesting does not reliably re-propagate when the source dictionary
+    /// is replaced wholesale (confirmed live: buttons, text/password box
+    /// fields, and ui:Card all stayed on the old theme's colors after a
+    /// swap, while Sifra.WindowBrush/Sifra.CardBrush — defined with
+    /// StaticResource INSIDE the swapped dictionary itself — updated
+    /// correctly). The fix is to stop relying on that propagation for the
+    /// WPF-UI-specific keys: explicitly overwrite each one, every time the
+    /// theme changes, with a fresh brush built from the NOW-current
+    /// Sifra.Theme.* color — the same direct-resource-key-replacement
+    /// mechanism already proven to work for Window/Card.
+    /// </summary>
+    private static void RefreshWpfUiBridgeKeys()
+    {
+        var resources = Application.Current.Resources;
+        Brush BrushFor(string themeColorKey) => new SolidColorBrush((Color)resources[themeColorKey]);
+
+        resources["TextControlBackground"] = BrushFor("Sifra.Theme.Input");
+        resources["TextControlBackgroundFocused"] = BrushFor("Sifra.Theme.Input");
+        resources["TextControlBackgroundPointerOver"] = BrushFor("Sifra.Theme.Card");
+        resources["TextControlBackgroundDisabled"] = BrushFor("Sifra.Theme.Hover");
+        resources["TextControlForeground"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["TextControlForegroundDisabled"] = BrushFor("Sifra.Theme.TextSecondary");
+        resources["TextControlPlaceholderForeground"] = BrushFor("Sifra.Theme.TextSecondary");
+        resources["TextControlButtonForeground"] = BrushFor("Sifra.Theme.TextSecondary");
+        resources["TextControlBorderBrushDisabled"] = BrushFor("Sifra.Theme.Border");
+        resources["TextControlElevationBorderBrush"] = BrushFor("Sifra.Theme.Border");
+
+        resources["CardBackground"] = BrushFor("Sifra.Theme.Card");
+        resources["CardForeground"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["CardBorderBrush"] = BrushFor("Sifra.Theme.Border");
+        resources["CardFooterBackground"] = BrushFor("Sifra.Theme.Card");
+
+        resources["ButtonBackground"] = BrushFor("Sifra.Theme.Card");
+        resources["ButtonBackgroundPointerOver"] = BrushFor("Sifra.Theme.Hover");
+        resources["ButtonBackgroundPressed"] = BrushFor("Sifra.Theme.Selected");
+        resources["ButtonForeground"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["ButtonForegroundPointerOver"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["ButtonForegroundPressed"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["ButtonBorderBrushDisabled"] = BrushFor("Sifra.Theme.Border");
+
+        // Always white, in both themes — NOT Sifra.Theme.SelectedText: that
+        // key means "text on a light SELECTED-ROW background" (blue in
+        // Light theme, for contrast against a pale blue row highlight),
+        // which is a different thing that happens to share a name. Reusing
+        // it here produced blue text on the blue accent button in Light
+        // theme — illegible. The brand's accent buttons always carry white
+        // text regardless of theme, so this is a fixed color, not a
+        // theme-reactive one.
+        var white = new SolidColorBrush(Colors.White);
+        resources["AccentButtonForeground"] = white;
+        resources["AccentButtonForegroundPointerOver"] = white;
+        resources["AccentButtonForegroundPressed"] = white;
+
+        resources["TextFillColorPrimaryBrush"] = BrushFor("Sifra.Theme.TextPrimary");
+        resources["TextFillColorSecondaryBrush"] = BrushFor("Sifra.Theme.TextSecondary");
+        resources["TextFillColorTertiaryBrush"] = BrushFor("Sifra.Theme.TextSecondary");
     }
 }

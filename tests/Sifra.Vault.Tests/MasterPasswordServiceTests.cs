@@ -145,6 +145,54 @@ public sealed class MasterPasswordServiceTests : IDisposable
         Assert.Single(alerts.Alerts);
     }
 
+    [Fact]
+    public void ChangePassword_WithACloudKeySlotStoreConfigured_RepublishesTheRewrappedSlot()
+    {
+        // Phase 3: a device that joined this vault via the cloud must keep
+        // working after a password change on the originating device — that
+        // requires the NEW wrapped slot to actually reach the cloud.
+        var authenticator = CreateAuthenticator();
+        authenticator.SetCredential(OldPassword);
+        var encryption = CreateEncryption();
+        var cloud = new LocalFakeCloudKeySlotStore();
+        var service = new MasterPasswordService(authenticator, encryption, cloudKeySlotStore: cloud);
+
+        service.ChangePassword(OldPassword, NewPassword);
+
+        var published = cloud.DownloadMasterPasswordSlot();
+        var localSlot = encryption.GetSlotOrThrow(VaultEncryptionService.MasterPasswordSlot);
+        Assert.Equal(localSlot, published);
+    }
+
+    [Fact]
+    public void ChangePassword_WhenTheCloudIsUnreachable_StillSucceedsLocally()
+    {
+        // Failure path: a cloud hiccup must never block or roll back an
+        // otherwise-successful local password change.
+        var authenticator = CreateAuthenticator();
+        authenticator.SetCredential(OldPassword);
+        var cloud = new LocalFakeCloudKeySlotStore { IsConnected = false };
+        var service = new MasterPasswordService(authenticator, CreateEncryption(), cloudKeySlotStore: cloud);
+
+        service.ChangePassword(OldPassword, NewPassword);
+
+        Assert.True(authenticator.Authenticate(NewPassword));
+    }
+
+    [Fact]
+    public void ChangePassword_WithNoCloudKeySlotStoreConfigured_NeverAttemptsToPublish()
+    {
+        // Existing/local-only vaults (the default) must behave exactly as
+        // before — no cloud dependency introduced when none was asked for.
+        var authenticator = CreateAuthenticator();
+        authenticator.SetCredential(OldPassword);
+        var service = new MasterPasswordService(authenticator, CreateEncryption());
+
+        service.ChangePassword(OldPassword, NewPassword); // must not throw for lack of a cloud store
+
+        Assert.True(authenticator.Authenticate(NewPassword));
+    }
+
     private sealed class AlwaysFailingSink : IAuditLogSink
     {
         public void Write(OperationLogEntry entry) => throw new AuditSinkUnavailableException("Simulated logging service outage.");

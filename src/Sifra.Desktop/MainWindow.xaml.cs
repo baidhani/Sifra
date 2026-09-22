@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,8 +17,10 @@ public partial class MainWindow : FluentWindow
     private readonly AppServices _services = new();
     private readonly IdleLockMonitor _idleLockMonitor = new();
     private readonly ExtensionPairingServer _pairingServer;
+    private readonly TrayIconManager _trayIcon = new();
     private bool _isUnlocked;
     private bool _resizeLocked;
+    private bool _allowRealClose;
 
     // Raised each time the vault transitions from locked to unlocked —
     // ExtensionPairingServer waits on this (via WaitForUnlockAsync) before
@@ -118,7 +121,97 @@ public partial class MainWindow : FluentWindow
         // showing the approval prompt (see that class and Unlocked above)
         // so approving requires proving the master password.
         _pairingServer = new ExtensionPairingServer(_services, this);
-        Closed += (_, _) => _pairingServer.Dispose();
+        Closed += (_, _) =>
+        {
+            _pairingServer.Dispose();
+            _trayIcon.Dispose(); // idempotent — also disposed explicitly by ExitApplication, covers the SessionEnding real-shutdown path too
+        };
+
+        _trayIcon.OpenRequested += (_, _) => RestoreFromTray();
+        _trayIcon.LockRequested += (_, _) =>
+        {
+            if (_isUnlocked)
+            {
+                ShowUnlock();
+            }
+        };
+        _trayIcon.ExitRequested += (_, _) => ExitApplication();
+
+        // A real OS sign-off/shutdown must never be blocked by the
+        // close-to-tray override below — Windows expects apps to actually
+        // exit when it says so.
+        Application.Current.SessionEnding += (_, _) => _allowRealClose = true;
+
+        Closing += OnWindowClosing;
+    }
+
+    /// <summary>Called by App.OnStartup for a silent auto-launch (see StartupRegistration) — the window is never shown at all, only the tray icon appears.</summary>
+    public void StartHiddenToTray() => _trayIcon.Show();
+
+    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        if (_allowRealClose)
+        {
+            return; // let it actually close — tray Exit or a real OS shutdown/sign-off
+        }
+
+        e.Cancel = true;
+        MinimizeToTray();
+    }
+
+    /// <summary>
+    /// The X button's actual behavior: hide instead of exit, and lock
+    /// immediately (per product decision — an unlocked vault sitting
+    /// hidden in the background for hours is a real exposure window if
+    /// the machine is left unattended). Harmless to call when already
+    /// locked or still on Setup — ShowUnlock() is only invoked when there
+    /// is something unlocked to actually lock.
+    /// </summary>
+    private void MinimizeToTray()
+    {
+        if (_isUnlocked)
+        {
+            ShowUnlock();
+        }
+
+        Hide();
+        _trayIcon.Show();
+    }
+
+    /// <summary>
+    /// Always lands on the Unlock screen — either because MinimizeToTray
+    /// already forced it there, or (belt-and-suspenders, per explicit
+    /// product decision) because this locks again regardless of whatever
+    /// state the window is actually in when restored. The tray icon itself
+    /// stays visible by default (AppSettings.KeepTrayIconVisibleWhenOpen)
+    /// — it's only ever removed by an explicit Exit, unless that setting
+    /// is turned off in Options.
+    /// </summary>
+    private void RestoreFromTray()
+    {
+        if (_isUnlocked)
+        {
+            ShowUnlock();
+        }
+
+        if (!_services.Settings.Get().KeepTrayIconVisibleWhenOpen)
+        {
+            _trayIcon.Hide();
+        }
+
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+        Activate();
+    }
+
+    private void ExitApplication()
+    {
+        _allowRealClose = true;
+        Close(); // triggers the Closed handler above, which disposes _trayIcon
+        Application.Current.Shutdown();
     }
 
     /// <summary>
@@ -256,6 +349,15 @@ public partial class MainWindow : FluentWindow
         _idleLockMonitor.Stop();
         _isUnlocked = false;
         SetCompactWindowSize();
+
+        // Every path that reaches ShowUnlock (explicit Lock, idle timeout,
+        // LockRequested) must stop VaultView's background sync timer too —
+        // otherwise it keeps ticking even after the screen is torn down.
+        if (RootGrid.Children.Count > 0 && RootGrid.Children[0] is ShellView activeShell)
+        {
+            activeShell.StopBackgroundSync();
+        }
+
         RootGrid.Children.Clear();
         var unlockView = new UnlockView(_services);
 

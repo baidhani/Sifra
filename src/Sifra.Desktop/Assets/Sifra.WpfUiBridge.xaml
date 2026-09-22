@@ -14,8 +14,19 @@
 
     Must be merged AFTER ui:ThemesDictionary/ui:ControlsDictionary so these
     definitions win. Never swapped by ThemeManager (only the
-    Sifra.Theme.Light/Dark.xaml entry is) — this dictionary is permanent;
-    it just keeps pointing at whichever theme colors are currently loaded.
+    Sifra.Theme.Light/Dark.xaml entry is) — this dictionary is permanent.
+
+    IMPORTANT: the Color="{DynamicResource Sifra.Theme.X}" bindings below
+    are only the INITIAL values, resolved once when this dictionary first
+    loads. A DynamicResource nested inside another dictionary's resource
+    does not reliably re-propagate when the SOURCE dictionary (Sifra.Theme.
+    Light/Dark.xaml) is swapped out wholesale — confirmed live: without
+    correction, buttons/text fields/ui:Card all kept the theme's colors
+    from whenever this file first loaded, regardless of later swaps. The
+    real, live-updating values come from ThemeManager.RefreshWpfUiBridgeKeys,
+    which explicitly overwrites every key below with a fresh brush on every
+    theme change. Do not remove that method thinking these XAML bindings
+    are sufficient on their own — they are not.
 
     Accent-appearance buttons (ui:Button Appearance="Primary") leave
     AccentButtonBackground alone — already Sifra's brand blue in both themes
@@ -62,10 +73,15 @@
     <Setter Property="SelectionTextBrush" Value="{DynamicResource Sifra.SelectedTextBrush}"/>
   </Style>
 
-  <!-- ui:Button, Accent (Appearance="Primary") foreground only — see note above -->
-  <SolidColorBrush x:Key="AccentButtonForeground" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
-  <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
-  <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="{DynamicResource Sifra.Theme.SelectedText}"/>
+  <!-- ui:Button, Accent (Appearance="Primary") foreground only — always
+       white in both themes (NOT Sifra.Theme.SelectedText: that key means
+       "text on a selected-row background," which is blue in Light theme —
+       reusing it here produced illegible blue-on-blue accent buttons).
+       See ThemeManager.RefreshWpfUiBridgeKeys, which is what actually
+       keeps this live; these are just the initial values. -->
+  <SolidColorBrush x:Key="AccentButtonForeground" Color="White"/>
+  <SolidColorBrush x:Key="AccentButtonForegroundPointerOver" Color="White"/>
+  <SolidColorBrush x:Key="AccentButtonForegroundPressed" Color="White"/>
 
   <!-- ui:Button, default (non-Accent) appearance -->
   <SolidColorBrush x:Key="ButtonBackground" Color="{DynamicResource Sifra.Theme.Card}"/>

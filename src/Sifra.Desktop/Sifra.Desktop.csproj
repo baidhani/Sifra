@@ -10,7 +10,20 @@
 
   <ItemGroup>
     <Resource Include="Assets\Sifra.ico" />
+    <Resource Include="Assets\SifraTrayIcon.ico" />
     <Resource Include="Assets\Brand\**\*.png" />
+  </ItemGroup>
+
+  <!-- UseWindowsForms (below) adds System.Windows.Forms/System.Drawing as global
+       implicit usings, which collide project-wide with WPF's own global usings
+       (UserControl, Brush, Application, KeyEventArgs, RadioButton all exist in
+       both namespaces). Removing them here keeps every other file unaffected;
+       TrayIconManager.cs — the only file that actually needs WinForms, for
+       NotifyIcon (WPF has no native tray-icon control) — declares its own
+       explicit `using System.Windows.Forms;` instead. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -19,7 +32,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- WinForms interop is only for System.Windows.Forms.NotifyIcon (the tray
+         icon) — WPF has no native tray-icon control, and WPF-UI 4.3.0 (checked
+         via reflection) doesn't provide one either. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\Sifra.ico</ApplicationIcon>
+    <!-- Shown on the Unlock screen so a screenshot/bug report can be tied
+         to a build. Bump this by hand as real milestones land — nothing
+         reads or enforces it automatically yet. -->
+    <Version>0.0.22</Version>
   </PropertyGroup>
 
 </Project>

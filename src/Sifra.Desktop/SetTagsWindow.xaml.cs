@@ -65,7 +65,7 @@ public partial class SetTagsWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (InvalidOperationException ex)
         {
-            MessageBox.Show(this, ex.Message, "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(this, ex.Message, "Sifra", ThemedMessageBox.Icon.Warning);
         }
 
         RefreshList();

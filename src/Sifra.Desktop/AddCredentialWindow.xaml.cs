@@ -227,7 +227,7 @@ public partial class AddCredentialWindow : Wpf.Ui.Controls.FluentWindow
         {
             // Failure path: an unreadable source file (deleted/locked between
             // picking it and reading it) must not crash the dialog.
-            MessageBox.Show(this, "Could not read that file.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(this, "Could not read that file.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
@@ -376,7 +376,7 @@ public partial class AddCredentialWindow : Wpf.Ui.Controls.FluentWindow
         catch (IOException)
         {
             // Failure path: destination locked/unwritable must not crash the dialog.
-            MessageBox.Show(this, "Could not save this file.", "Sifra", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ThemedMessageBox.Show(this, "Could not save this file.", "Sifra", ThemedMessageBox.Icon.Warning);
         }
     }
 
