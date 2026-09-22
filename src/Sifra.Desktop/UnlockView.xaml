@@ -8,7 +8,16 @@
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid>
         <ui:Card HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+            <!-- Bottom margin biases the centered content upward by half its
+                 value — needed because centering purely on the available
+                 height makes the empty space above (which visually includes
+                 the title bar, since there's no dividing line separating
+                 chrome from content to the eye) look bigger than the space
+                 below, even though the two are geometrically equal within
+                 the content Grid itself. ~18px closes that gap (measured via
+                 UI Automation: title-bar-top-to-icon vs button-to-window-
+                 bottom were 178px vs 160px before this). -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Unlock your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,20"/>
 

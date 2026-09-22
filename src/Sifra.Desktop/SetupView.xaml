@@ -13,7 +13,11 @@
              single-screen layout clipped content by cramming every path's
              fields into one card regardless of which one the user wanted. -->
         <ui:Card x:Name="ChoicePanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360">
+            <!-- Bottom margin biases centered content upward — see UnlockView's
+                 identical StackPanel for why (title bar visually adds to the
+                 perceived top space, making pure geometric centering look
+                 bottom-heavy). -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="360" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Vault Setup" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                 <ui:TextBlock Text="This is the first time Sifra has run on this device. How would you like to set up your vault?" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,24"/>
@@ -35,7 +39,7 @@
 
         <!-- Step 2a: Create a new vault. -->
         <ui:Card x:Name="CreatePanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Create your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                 <ui:TextBlock Text="Choose a master password to protect your vault. Cloud sync can be set up later from Options." TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
@@ -58,7 +62,7 @@
 
         <!-- Step 2b: Restore from cloud — pick which provider account holds the vault. -->
         <ui:Card x:Name="CloudProviderPanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Restore from cloud" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                 <ui:TextBlock Text="Which cloud account holds your vault?" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,16"/>
@@ -82,7 +86,7 @@
 
         <!-- Step 3b: Restore from cloud — sign in + master password. -->
         <ui:Card x:Name="CloudRestorePanel" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="32" BorderThickness="0">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="316" Margin="0,0,0,18">
                 <Image Source="Assets/Brand/sifra_symbol_128.png" Width="48" Height="48" Margin="0,0,0,16" HorizontalAlignment="Center"/>
                 <ui:TextBlock Text="Restore your vault" FontTypography="Subtitle" HorizontalAlignment="Center" Margin="0,0,0,8"/>
                 <ui:TextBlock x:Name="CloudRestoreDescriptionText" TextWrapping="Wrap" FontTypography="Body" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,24"/>
