@@ -301,6 +301,9 @@
                             <MenuItem x:Name="ContextEditItem" Header="Edit" Click="OnContextEditClick"/>
                             <MenuItem x:Name="ContextSetTagsItem" Header="Set Tags..." Click="OnContextSetTagsClick"/>
                             <MenuItem x:Name="ContextFavoriteItem" Click="OnContextToggleFavoriteClick"/>
+                            <MenuItem x:Name="ContextDuplicateItem" Header="Duplicate" Click="OnContextDuplicateClick"/>
+                            <MenuItem x:Name="ContextCopyAsTextItem" Header="Copy as Text" Click="OnContextCopyAsTextClick"/>
+                            <MenuItem x:Name="ContextExportItem" Header="Export..." Click="OnContextExportClick"/>
                             <Separator x:Name="ContextSeparator1"/>
                             <MenuItem x:Name="ContextArchiveItem" Click="OnContextToggleArchiveClick"/>
                             <MenuItem x:Name="ContextLockItem" Header="Lock" Click="OnContextLockClick"/>

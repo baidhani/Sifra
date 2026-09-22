@@ -137,6 +137,61 @@ public sealed class CredentialService
         _auditLogger?.Log(nameof(Edit), Environment.UserName, details: $"id={id}");
     }
 
+    /// <summary>
+    /// Creates an independent copy of a credential — new id, "(copy)"
+    /// appended to the label, same fields/tags/icon metadata — but never
+    /// favorite/locked/archived/deleted: a duplicate always starts as a
+    /// fresh, ordinary item regardless of the original's state. Field
+    /// values are copied as their already-encrypted bytes (the vault's
+    /// encryption key isn't per-credential, so no decrypt/re-encrypt round
+    /// trip is needed).
+    /// </summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public string Duplicate(string id)
+    {
+        var existing = FindOrThrow(id);
+        var now = DateTimeOffset.UtcNow;
+        var newId = Guid.NewGuid().ToString("N");
+
+        _store.Upsert(new Credential(
+            newId,
+            existing.Label + " (copy)",
+            existing.Fields.Select(f => f with { UpdatedAtUtc = now }).ToList(),
+            now,
+            now,
+            IsFavorite: false,
+            Tags: existing.Tags,
+            Icon: existing.Icon));
+
+        _auditLogger?.Log(nameof(Duplicate), Environment.UserName, details: $"id={id} newId={newId}");
+        return newId;
+    }
+
+    /// <summary>Copies a plain-text summary of the credential (label + every non-empty field) to the clipboard.</summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    /// <exception cref="ClipboardUnavailableException">The system denied clipboard access.</exception>
+    public void CopyAsText(string vaultCredential, string id)
+    {
+        _clipboard.SetText(BuildPlainTextSummary(GetById(vaultCredential, id)));
+        _auditLogger?.Log(nameof(CopyAsText), Environment.UserName, details: $"id={id}");
+    }
+
+    /// <summary>Same plain-text summary as CopyAsText, returned directly for writing to a file instead of the clipboard — see VaultView's Export action.</summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public string ExportAsText(string vaultCredential, string id)
+    {
+        var text = BuildPlainTextSummary(GetById(vaultCredential, id));
+        _auditLogger?.Log(nameof(ExportAsText), Environment.UserName, details: $"id={id}");
+        return text;
+    }
+
+    private static string BuildPlainTextSummary(CredentialView view)
+    {
+        var lines = new List<string> { view.Label };
+        lines.AddRange(view.Fields.Where(f => f.Value.Length > 0).Select(f => $"{f.Name}: {f.Value}"));
+        return string.Join(Environment.NewLine, lines);
+    }
+
     /// <summary>Sets the credential's icon (symbol/color/custom/website-favicon) without touching any other field.</summary>
     /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
     public void SetIcon(string id, CredentialIcon? icon)

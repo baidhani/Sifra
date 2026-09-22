@@ -1,6 +1,9 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 using Sifra.Vault.Auth;
+using Sifra.Vault.Credentials;
 using Sifra.Vault.Dropbox;
 using Sifra.Vault.GoogleDrive;
 using Sifra.Vault.PCloud;
@@ -315,6 +318,15 @@ public partial class VaultView : UserControl
             ContextEditItem.Visibility = Visibility.Collapsed;
             ContextSetTagsItem.Visibility = Visibility.Collapsed;
             ContextFavoriteItem.Visibility = Visibility.Collapsed;
+            // Duplicate, Copy as Text, and Export are all read-only with
+            // respect to the original item — Duplicate creates a brand-new
+            // credential rather than modifying this one, so Lock (which
+            // guards against modifying/deleting the original) has no
+            // reason to block any of the three just because the item is
+            // locked-and-not-session-unlocked.
+            ContextDuplicateItem.Visibility = Visibility.Visible;
+            ContextCopyAsTextItem.Visibility = Visibility.Visible;
+            ContextExportItem.Visibility = Visibility.Visible;
             ContextSeparator1.Visibility = Visibility.Collapsed;
             ContextArchiveItem.Visibility = Visibility.Collapsed;
             ContextLockItem.Visibility = Visibility.Collapsed;
@@ -331,6 +343,10 @@ public partial class VaultView : UserControl
         ContextSetTagsItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextFavoriteItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextFavoriteItem.Header = row.IsFavorite ? "Remove from Favorites" : "Add to Favorites";
+        ContextDuplicateItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
+        // Read-only actions — available regardless of trashed/locked state.
+        ContextCopyAsTextItem.Visibility = Visibility.Visible;
+        ContextExportItem.Visibility = Visibility.Visible;
         ContextSeparator1.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextArchiveItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextArchiveItem.Header = row.IsArchived ? "Unarchive" : "Archive";
@@ -422,6 +438,64 @@ public partial class VaultView : UserControl
 
         _services.Credentials.SetFavorite(row.Id, !row.IsFavorite);
         TryRefresh(row.Id);
+    }
+
+    private void OnContextDuplicateClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuRow is not { } row)
+        {
+            return;
+        }
+
+        var newId = _services.Credentials.Duplicate(row.Id);
+        TryRefresh(newId);
+    }
+
+    private void OnContextCopyAsTextClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuRow is not { } row)
+        {
+            return;
+        }
+
+        try
+        {
+            _services.Credentials.CopyAsText(_vaultCredential, row.Id);
+        }
+        catch (ClipboardUnavailableException)
+        {
+            // Failure path: another process briefly holding the clipboard must not crash the app.
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not copy to the clipboard.", "Sifra", ThemedMessageBox.Icon.Warning);
+        }
+    }
+
+    private void OnContextExportClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuRow is not { } row)
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            FileName = row.Label,
+            DefaultExt = ".txt",
+            Filter = "Text file (*.txt)|*.txt|All files (*.*)|*.*",
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dialog.FileName, _services.Credentials.ExportAsText(_vaultCredential, row.Id));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Failure path: e.g. the target file is open in another program, or the folder is read-only.
+            ThemedMessageBox.Show(Window.GetWindow(this), "Could not save this file.", "Sifra", ThemedMessageBox.Icon.Warning);
+        }
     }
 
     private void OnContextToggleArchiveClick(object sender, RoutedEventArgs e)

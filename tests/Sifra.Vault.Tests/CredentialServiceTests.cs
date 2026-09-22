@@ -142,6 +142,91 @@ public sealed class CredentialServiceTests : IDisposable
     }
 
     [Fact]
+    public void Duplicate_CreatesAnIndependentCopyWithCopySuffixAndResetState()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"), isFavorite: true, tags: new[] { "Work" });
+        service.SetLocked(id, true);
+        service.SetArchived(id, true);
+
+        var newId = service.Duplicate(id);
+
+        Assert.NotEqual(id, newId);
+        var copy = service.GetById(VaultCredential, newId);
+        Assert.Equal("GitHub (copy)", copy.Label);
+        Assert.Equal("firas", copy.Username());
+        Assert.Equal("hunter2", copy.Password());
+        Assert.Equal(new[] { "Work" }, copy.Tags);
+        // A duplicate always starts fresh — it doesn't inherit the
+        // original's favorite/lock/archive state.
+        Assert.False(copy.IsFavorite);
+        Assert.False(copy.IsLocked);
+        Assert.False(copy.IsArchived);
+        // The original is untouched.
+        var original = service.GetById(VaultCredential, id);
+        Assert.Equal("GitHub", original.Label);
+        Assert.True(original.IsLocked);
+        Assert.True(original.IsArchived);
+    }
+
+    [Fact]
+    public void Duplicate_ForNonExistentCredential_ThrowsCredentialNotFoundException()
+    {
+        // Failure path: "user attempts to duplicate a non-existent credential."
+        var service = CreateService();
+
+        Assert.Throws<CredentialNotFoundException>(() => service.Duplicate("does-not-exist"));
+    }
+
+    [Fact]
+    public void CopyAsText_WritesLabelAndFieldsToClipboard()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+
+        service.CopyAsText(VaultCredential, id);
+
+        Assert.NotNull(_clipboard.LastCopiedValue);
+        Assert.Contains("GitHub", _clipboard.LastCopiedValue);
+        Assert.Contains("firas", _clipboard.LastCopiedValue);
+        Assert.Contains("hunter2", _clipboard.LastCopiedValue);
+    }
+
+    [Fact]
+    public void CopyAsText_WhenClipboardIsDenied_ThrowsClipboardUnavailableException()
+    {
+        // Failure path: "clipboard access is denied by the system."
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        _clipboard.SimulateFailure = true;
+
+        Assert.Throws<ClipboardUnavailableException>(() => service.CopyAsText(VaultCredential, id));
+    }
+
+    [Fact]
+    public void ExportAsText_ReturnsLabelAndFieldsWithoutTouchingTheClipboard()
+    {
+        var service = CreateService();
+        var id = service.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+
+        var text = service.ExportAsText(VaultCredential, id);
+
+        Assert.Contains("GitHub", text);
+        Assert.Contains("firas", text);
+        Assert.Contains("hunter2", text);
+        Assert.Null(_clipboard.LastCopiedValue);
+    }
+
+    [Fact]
+    public void ExportAsText_ForNonExistentCredential_ThrowsCredentialNotFoundException()
+    {
+        // Failure path: "user attempts to export a non-existent credential."
+        var service = CreateService();
+
+        Assert.Throws<CredentialNotFoundException>(() => service.ExportAsText(VaultCredential, "does-not-exist"));
+    }
+
+    [Fact]
     public void CopyUsername_HasNoDependencyOnConnectivityAtAll()
     {
         // Failure path: "user tries to copy while offline." CredentialService
