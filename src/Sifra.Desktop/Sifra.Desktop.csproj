@@ -40,7 +40,7 @@
     <!-- Shown on the Unlock screen so a screenshot/bug report can be tied
          to a build. Bump this by hand as real milestones land — nothing
          reads or enforces it automatically yet. -->
-    <Version>0.0.30</Version>
+    <Version>0.0.31</Version>
   </PropertyGroup>
 
 </Project>

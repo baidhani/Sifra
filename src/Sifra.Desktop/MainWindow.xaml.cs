@@ -103,7 +103,10 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
-        SetCompactWindowSize();
+        // No blanket sizing call here — ShowInitialScreen() immediately calls
+        // whichever of SetSetupWindowSize()/SetUnlockWindowSize() applies
+        // (via ShowUnlock()), so a call here would just be instantly
+        // overridden.
         ShowInitialScreen();
 
         // Any user input anywhere in the window counts as activity — Preview
@@ -335,6 +338,7 @@ public partial class MainWindow : FluentWindow
             return;
         }
 
+        SetSetupWindowSize();
         var setupView = new SetupView(_services);
         setupView.SetupComplete += (_, _) => ShowUnlock();
         RootGrid.Children.Add(setupView);
@@ -348,7 +352,7 @@ public partial class MainWindow : FluentWindow
         // toward a second auto-lock.
         _idleLockMonitor.Stop();
         _isUnlocked = false;
-        SetCompactWindowSize();
+        SetUnlockWindowSize();
 
         // Every path that reaches ShowUnlock (explicit Lock, idle timeout,
         // LockRequested) must stop VaultView's background sync timer too —
@@ -398,6 +402,14 @@ public partial class MainWindow : FluentWindow
         _idleLockMonitor.Start(minutes is > 0 ? TimeSpan.FromMinutes(minutes.Value) : null);
     }
 
+    // Setup and Unlock each get their own sizing method (below) so one can be
+    // tuned (e.g. a different height) without silently resizing the other —
+    // they used to share a single SetCompactWindowSize(), which meant any
+    // height change to one screen was a height change to both, since it's
+    // the same live window just swapping which UserControl sits in
+    // RootGrid. Both still share this helper for the chrome settings that
+    // really are identical between them.
+    //
     // Setup/Unlock's card fills the window edge-to-edge (Stretch alignment).
     // SizeToContent cannot size a Stretch element correctly — it measures with
     // an infinite available size, so Stretch falls back to the content's
@@ -405,20 +417,12 @@ public partial class MainWindow : FluentWindow
     // the window larger than what the child actually arranges to, leaving a
     // gap. A fixed size gives Stretch a real, finite target to fill from the
     // first layout pass, so the card always matches the window exactly.
-    private void SetCompactWindowSize()
+    private void ApplyCompactWindowChrome(double width, double height)
     {
-        // 480, not 420: the Setup recovery-key panel needs ~396px of inner
-        // content width to fit its 39-character key on one line without
-        // wrapping (39 monospace chars + textbox padding), plus 64px of card
-        // padding (32 each side) — and a further ~20px of slack beyond that
-        // exact sum, or rounded-corner/glyph anti-aliasing bleeds past the
-        // content's own boundary and gets clipped (confirmed: happened at
-        // exactly-396-fits-396 with zero slack; the narrower intro panel,
-        // with 40px of slack per side, never showed it).
-        MinWidth = 480;
-        MinHeight = 560;
-        Width = 480;
-        Height = 560;
+        MinWidth = width;
+        MinHeight = height;
+        Width = width;
+        Height = height;
         SizeToContent = SizeToContent.Manual;
         // Setup/Unlock's card fills the window edge-to-edge, so blend the title
         // bar into it by matching its background instead of leaving the
@@ -437,6 +441,29 @@ public partial class MainWindow : FluentWindow
         // Add/Edit dialog which never had this backdrop in the first place.
         WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType.None;
         CenterOnScreen();
+    }
+
+    private void SetSetupWindowSize()
+    {
+        // 480, not 420: the Setup recovery-key panel needs ~396px of inner
+        // content width to fit its 39-character key on one line without
+        // wrapping (39 monospace chars + textbox padding), plus 64px of card
+        // padding (32 each side) — and a further ~20px of slack beyond that
+        // exact sum, or rounded-corner/glyph anti-aliasing bleeds past the
+        // content's own boundary and gets clipped (confirmed: happened at
+        // exactly-396-fits-396 with zero slack; the narrower intro panel,
+        // with 40px of slack per side, never showed it).
+        ApplyCompactWindowChrome(480, 560);
+    }
+
+    private void SetUnlockWindowSize()
+    {
+        // Same size as Setup for now (they started as one shared method) —
+        // free to diverge independently going forward. If this height
+        // changes, re-verify UnlockView's centering Margin (currently tuned
+        // via UI Automation measurement for height=560 — see UnlockView.xaml)
+        // rather than assuming it still holds at a different height.
+        ApplyCompactWindowChrome(480, 560);
     }
 
     private void SetShellWindowSize()
