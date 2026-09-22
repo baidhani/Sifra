@@ -249,7 +249,7 @@
                     <RadioButton x:Name="TrashCategory" Style="{StaticResource CategoryItem}" Tag="Trash" Checked="OnCategoryChanged">
                         <RadioButton.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Empty trash bin..." Click="OnEmptyTrashClick"/>
+                                <MenuItem Header="Empty trash bin..." Icon="{ui:SymbolIcon Broom24}" Click="OnEmptyTrashClick"/>
                             </ContextMenu>
                         </RadioButton.ContextMenu>
                         <Grid>
@@ -298,20 +298,20 @@
                          MouseDoubleClick="OnCredentialsListDoubleClick" ContextMenuOpening="OnCredentialContextMenuOpening">
                     <ListBox.ContextMenu>
                         <ContextMenu x:Name="CredentialContextMenu">
-                            <MenuItem x:Name="ContextEditItem" Header="Edit" Click="OnContextEditClick"/>
-                            <MenuItem x:Name="ContextSetTagsItem" Header="Set Tags..." Click="OnContextSetTagsClick"/>
-                            <MenuItem x:Name="ContextFavoriteItem" Click="OnContextToggleFavoriteClick"/>
-                            <MenuItem x:Name="ContextDuplicateItem" Header="Duplicate" Click="OnContextDuplicateClick"/>
-                            <MenuItem x:Name="ContextCopyAsTextItem" Header="Copy as Text" Click="OnContextCopyAsTextClick"/>
-                            <MenuItem x:Name="ContextExportItem" Header="Export..." Click="OnContextExportClick"/>
+                            <MenuItem x:Name="ContextEditItem" Header="Edit" Icon="{ui:SymbolIcon Edit24}" Click="OnContextEditClick"/>
+                            <MenuItem x:Name="ContextSetTagsItem" Header="Set Tags..." Icon="{ui:SymbolIcon Tag24}" Click="OnContextSetTagsClick"/>
+                            <MenuItem x:Name="ContextFavoriteItem" Icon="{ui:SymbolIcon Star24}" Click="OnContextToggleFavoriteClick"/>
+                            <MenuItem x:Name="ContextDuplicateItem" Header="Duplicate" Icon="{ui:SymbolIcon Copy24}" Click="OnContextDuplicateClick"/>
+                            <MenuItem x:Name="ContextCopyAsTextItem" Header="Copy as Text" Icon="{ui:SymbolIcon ClipboardTextLtr24}" Click="OnContextCopyAsTextClick"/>
+                            <MenuItem x:Name="ContextExportItem" Header="Export..." Icon="{ui:SymbolIcon ArrowExportLtr24}" Click="OnContextExportClick"/>
                             <Separator x:Name="ContextSeparator1"/>
-                            <MenuItem x:Name="ContextArchiveItem" Click="OnContextToggleArchiveClick"/>
-                            <MenuItem x:Name="ContextLockItem" Header="Lock" Click="OnContextLockClick"/>
-                            <MenuItem x:Name="ContextRemoveLockItem" Header="Remove Lock..." Click="OnContextRemoveLockClick"/>
-                            <MenuItem x:Name="ContextDeleteItem" Header="Delete" Click="OnContextDeleteClick"/>
-                            <MenuItem x:Name="ContextRestoreItem" Header="Restore" Click="OnContextRestoreClick"/>
-                            <MenuItem x:Name="ContextDeletePermanentlyItem" Header="Delete permanently..." Click="OnContextDeletePermanentlyClick"/>
-                            <MenuItem x:Name="ContextUnlockItem" Header="Unlock..." Click="OnContextUnlockClick"/>
+                            <MenuItem x:Name="ContextArchiveItem" Icon="{ui:SymbolIcon Archive24}" Click="OnContextToggleArchiveClick"/>
+                            <MenuItem x:Name="ContextLockItem" Header="Lock" Icon="{ui:SymbolIcon LockClosed24}" Click="OnContextLockClick"/>
+                            <MenuItem x:Name="ContextRemoveLockItem" Header="Remove Lock..." Icon="{ui:SymbolIcon LockOpen24}" Click="OnContextRemoveLockClick"/>
+                            <MenuItem x:Name="ContextDeleteItem" Header="Delete" Icon="{ui:SymbolIcon Delete24}" Click="OnContextDeleteClick"/>
+                            <MenuItem x:Name="ContextRestoreItem" Header="Restore" Icon="{ui:SymbolIcon ArrowUndo24}" Click="OnContextRestoreClick"/>
+                            <MenuItem x:Name="ContextDeletePermanentlyItem" Header="Delete permanently..." Icon="{ui:SymbolIcon Delete24}" Click="OnContextDeletePermanentlyClick"/>
+                            <MenuItem x:Name="ContextUnlockItem" Header="Unlock..." Icon="{ui:SymbolIcon LockOpen24}" Click="OnContextUnlockClick"/>
                         </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.ItemContainerStyle>
