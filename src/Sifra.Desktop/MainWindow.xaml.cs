@@ -14,10 +14,17 @@ public partial class MainWindow : FluentWindow
     private const int GWLP_WNDPROC = -4;
     private const int ResizeEdgeThresholdPx = 8;
 
+    private static readonly TimeSpan VisibleSyncInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MinimizedSyncInterval = TimeSpan.FromHours(1);
+
     private readonly AppServices _services = new();
     private readonly IdleLockMonitor _idleLockMonitor = new();
     private readonly ExtensionPairingServer _pairingServer;
     private readonly TrayIconManager _trayIcon = new();
+    // Owned here, not by any per-session screen, and started once for the
+    // app's whole lifetime — see SyncScheduler's own remarks on why it
+    // deliberately keeps running independent of vault lock state.
+    private readonly SyncScheduler _syncScheduler;
     private bool _isUnlocked;
     private bool _resizeLocked;
     private bool _allowRealClose;
@@ -103,6 +110,15 @@ public partial class MainWindow : FluentWindow
     public MainWindow()
     {
         InitializeComponent();
+
+        // Started immediately, before any vault is ever unlocked — a
+        // no-op tick (ActiveSyncProvider null) is harmless, and starting
+        // this early means a vault configured for sync on a previous run
+        // starts syncing again right away rather than waiting for the
+        // user to unlock first.
+        _syncScheduler = new SyncScheduler(_services, VisibleSyncInterval);
+        _syncScheduler.Start();
+
         // No blanket sizing call here — ShowInitialScreen() immediately calls
         // whichever of SetSetupWindowSize()/SetUnlockWindowSize() applies
         // (via ShowUnlock()), so a call here would just be instantly
@@ -128,6 +144,12 @@ public partial class MainWindow : FluentWindow
         {
             _pairingServer.Dispose();
             _trayIcon.Dispose(); // idempotent — also disposed explicitly by ExitApplication, covers the SessionEnding real-shutdown path too
+            // ShutdownMode="OnExplicitShutdown" (App.xaml) means this is the
+            // one place that actually ends the process — Closed only ever
+            // fires on a genuine exit (tray Exit, CloseToTray-off X button,
+            // or a real OS shutdown/sign-off), never on a hide-to-tray,
+            // which cancels the Closing event instead of letting it reach here.
+            Application.Current.Shutdown();
         };
 
         _trayIcon.OpenRequested += (_, _) => RestoreFromTray();
@@ -146,16 +168,60 @@ public partial class MainWindow : FluentWindow
         Application.Current.SessionEnding += (_, _) => _allowRealClose = true;
 
         Closing += OnWindowClosing;
+
+        // Shown immediately at launch (not just reactively on the first
+        // minimize) and kept in sync any time Options changes the setting —
+        // see SyncTrayIconVisibility's remarks.
+        SyncTrayIconVisibility();
     }
 
-    /// <summary>Called by App.OnStartup for a silent auto-launch (see StartupRegistration) — the window is never shown at all, only the tray icon appears.</summary>
-    public void StartHiddenToTray() => _trayIcon.Show();
+    /// <summary>
+    /// Called by App.OnStartup for a silent auto-launch (see
+    /// StartupRegistration) — the window is never shown at all. If the
+    /// tray icon is disabled, hiding with no tray icon would strand the
+    /// app with no way to reach it at all, so this falls back to showing
+    /// the window normally instead of respecting --minimized.
+    /// </summary>
+    public void StartHiddenToTray()
+    {
+        if (!_services.Settings.Get().ShowTrayIcon)
+        {
+            Show();
+        }
+    }
+
+    /// <summary>
+    /// Applies AppSettings.ShowTrayIcon's current value to the actual tray
+    /// icon — called once at startup and again any time Options saves a
+    /// change, so toggling the setting takes effect immediately without
+    /// requiring a restart. Tray icon visibility is now independent of
+    /// whether the main window is open, minimized, or hidden (see
+    /// ShowTrayIcon's own remarks) — RestoreFromTray/MinimizeToTray no
+    /// longer touch it at all.
+    /// </summary>
+    private void SyncTrayIconVisibility()
+    {
+        if (_services.Settings.Get().ShowTrayIcon)
+        {
+            _trayIcon.Show();
+        }
+        else
+        {
+            _trayIcon.Hide();
+        }
+    }
 
     private void OnWindowClosing(object? sender, CancelEventArgs e)
     {
         if (_allowRealClose)
         {
-            return; // let it actually close — tray Exit or a real OS shutdown/sign-off
+            return; // let it actually close — tray Exit, CloseToTray-off, or a real OS shutdown/sign-off
+        }
+
+        if (!_services.Settings.Get().CloseToTray)
+        {
+            _allowRealClose = true;
+            return; // let it actually close this time — no tray to hide to (or the user just doesn't want that behavior)
         }
 
         e.Cancel = true;
@@ -178,17 +244,26 @@ public partial class MainWindow : FluentWindow
         }
 
         Hide();
-        _trayIcon.Show();
+        // Tray icon visibility no longer changes here — see
+        // SyncTrayIconVisibility's remarks; CloseToTray being enabled
+        // already implies ShowTrayIcon is too, so it's always showing by
+        // the time this runs.
+        //
+        // Background sync keeps running while minimized (it never touches
+        // decrypted vault data) but backs off to a much slower cadence —
+        // no one's actively watching the sync status while the window is
+        // hidden, so there's no reason to keep hitting the cloud provider
+        // every 5 minutes.
+        _syncScheduler.SetInterval(MinimizedSyncInterval);
     }
 
     /// <summary>
     /// Always lands on the Unlock screen — either because MinimizeToTray
     /// already forced it there, or (belt-and-suspenders, per explicit
     /// product decision) because this locks again regardless of whatever
-    /// state the window is actually in when restored. The tray icon itself
-    /// stays visible by default (AppSettings.KeepTrayIconVisibleWhenOpen)
-    /// — it's only ever removed by an explicit Exit, unless that setting
-    /// is turned off in Options.
+    /// state the window is actually in when restored. Tray icon visibility
+    /// is independent of this now (see SyncTrayIconVisibility's remarks) —
+    /// restoring the window never hides it.
     /// </summary>
     private void RestoreFromTray()
     {
@@ -197,24 +272,19 @@ public partial class MainWindow : FluentWindow
             ShowUnlock();
         }
 
-        if (!_services.Settings.Get().KeepTrayIconVisibleWhenOpen)
-        {
-            _trayIcon.Hide();
-        }
-
         Show();
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
         }
         Activate();
+        _syncScheduler.SetInterval(VisibleSyncInterval);
     }
 
     private void ExitApplication()
     {
         _allowRealClose = true;
-        Close(); // triggers the Closed handler above, which disposes _trayIcon
-        Application.Current.Shutdown();
+        Close(); // triggers the Closed handler above, which disposes _trayIcon and shuts down
     }
 
     /// <summary>
@@ -355,11 +425,14 @@ public partial class MainWindow : FluentWindow
         SetUnlockWindowSize();
 
         // Every path that reaches ShowUnlock (explicit Lock, idle timeout,
-        // LockRequested) must stop VaultView's background sync timer too —
-        // otherwise it keeps ticking even after the screen is torn down.
+        // LockRequested) must detach VaultView's sync-status subscription —
+        // otherwise it keeps trying to update a UI that's about to be torn
+        // down. The shared SyncScheduler itself is never stopped here: it's
+        // owned by this window and keeps running independent of lock state
+        // (see SyncScheduler's own remarks).
         if (RootGrid.Children.Count > 0 && RootGrid.Children[0] is ShellView activeShell)
         {
-            activeShell.StopBackgroundSync();
+            activeShell.DetachFromSyncScheduler();
         }
 
         RootGrid.Children.Clear();
@@ -386,9 +459,13 @@ public partial class MainWindow : FluentWindow
             _currentUnlockViewPairingHandler = null;
             RootGrid.Children.Clear();
             SetShellWindowSize();
-            var shellView = new ShellView(_services, vaultCredential);
+            var shellView = new ShellView(_services, vaultCredential, _syncScheduler);
             shellView.LockRequested += (_, _) => ShowUnlock();
-            shellView.SettingsChanged += (_, _) => StartIdleLockMonitor();
+            shellView.SettingsChanged += (_, _) =>
+            {
+                StartIdleLockMonitor();
+                SyncTrayIconVisibility();
+            };
             RootGrid.Children.Add(shellView);
             StartIdleLockMonitor();
             Unlocked?.Invoke(this, EventArgs.Empty);

@@ -40,7 +40,8 @@ public partial class OptionsWindow : FluentWindow
         // StartupRegistration's remarks — so this reads it directly rather
         // than trusting any cached/remembered state.
         StartWithWindowsCheckBox.IsChecked = StartupRegistration.IsEnabled();
-        KeepTrayIconVisibleCheckBox.IsChecked = current.KeepTrayIconVisibleWhenOpen;
+        ShowTrayIconCheckBox.IsChecked = current.ShowTrayIcon;
+        CloseToTrayCheckBox.IsChecked = current.CloseToTray;
 
         (current.ThemePreference switch
         {
@@ -50,6 +51,24 @@ public partial class OptionsWindow : FluentWindow
         }).IsChecked = true;
 
         RefreshSyncProviderStatus();
+    }
+
+    /// <summary>Turning tray icon off implies "close to tray" makes no sense any more — there'd be no icon to restore from.</summary>
+    private void OnShowTrayIconChanged(object sender, RoutedEventArgs e)
+    {
+        if (ShowTrayIconCheckBox.IsChecked != true)
+        {
+            CloseToTrayCheckBox.IsChecked = false;
+        }
+    }
+
+    /// <summary>Enabling "close to tray" requires the tray icon to actually exist.</summary>
+    private void OnCloseToTrayChanged(object sender, RoutedEventArgs e)
+    {
+        if (CloseToTrayCheckBox.IsChecked == true)
+        {
+            ShowTrayIconCheckBox.IsChecked = true;
+        }
     }
 
     private void RefreshSyncProviderStatus()
@@ -107,7 +126,8 @@ public partial class OptionsWindow : FluentWindow
         _services.Settings.Save(_services.Settings.Get() with
         {
             AutoLockMinutes = minutes,
-            KeepTrayIconVisibleWhenOpen = KeepTrayIconVisibleCheckBox.IsChecked == true,
+            ShowTrayIcon = ShowTrayIconCheckBox.IsChecked == true,
+            CloseToTray = CloseToTrayCheckBox.IsChecked == true,
             ThemePreference = themePreference,
         });
 

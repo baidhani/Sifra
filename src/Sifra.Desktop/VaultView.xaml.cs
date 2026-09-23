@@ -18,17 +18,19 @@ public partial class VaultView : UserControl
     private readonly string _vaultCredential;
     private readonly CredentialDetailView _detailView;
     private readonly SyncScheduler _syncScheduler;
+    private readonly EventHandler<string> _syncStatusHandler;
     private List<CredentialRow> _allRows = new();
     private string _category = "All"; // "All" | "Favorites" | "Weak" | "Reused" | "Compromised" | a label name
 
     public event EventHandler? LockRequested;
     public event EventHandler? SettingsChanged;
 
-    public VaultView(AppServices services, string vaultCredential)
+    public VaultView(AppServices services, string vaultCredential, SyncScheduler syncScheduler)
     {
         InitializeComponent();
         _services = services;
         _vaultCredential = vaultCredential;
+        _syncScheduler = syncScheduler;
 
         _detailView = new CredentialDetailView(services, vaultCredential);
         // Same reselect-after-rebuild fix as OnEditCredentialClick — this
@@ -57,11 +59,12 @@ public partial class VaultView : UserControl
         TryRefresh();
         UpdateSyncPanel();
 
-        // Background sync: an immediate attempt on unlock, then every 5
-        // minutes while this screen stays up. See SyncScheduler's remarks
-        // on why it never opens a browser on its own.
-        _syncScheduler = new SyncScheduler(_services);
-        _syncScheduler.StatusChanged += (_, status) =>
+        // The scheduler itself is owned and started by MainWindow for the
+        // app's whole lifetime — this view only listens for status updates
+        // while it's the one currently on screen. See SyncScheduler's own
+        // remarks on why it never opens a browser on its own, and keeps
+        // running independent of vault lock state.
+        _syncStatusHandler = (_, status) =>
         {
             UpdateSyncPanel(status);
             if (!TryRefresh())
@@ -69,7 +72,7 @@ public partial class VaultView : UserControl
                 UpdateSyncPanel("Synced, but the list couldn't refresh — a record could not be decrypted.");
             }
         };
-        _syncScheduler.Start();
+        _syncScheduler.StatusChanged += _syncStatusHandler;
     }
 
     /// <summary>
@@ -125,8 +128,13 @@ public partial class VaultView : UserControl
         }
     }
 
-    /// <summary>Called by ShellView (via MainWindow.ShowUnlock) right before this screen is torn down, so the background timer doesn't keep ticking after the vault locks.</summary>
-    public void StopBackgroundSync() => _syncScheduler.Stop();
+    /// <summary>
+    /// Called by ShellView (via MainWindow.ShowUnlock) right before this
+    /// screen is torn down. Only unsubscribes from the shared scheduler's
+    /// status updates — the scheduler itself keeps running (it's
+    /// MainWindow's, not this view's) regardless of the vault locking.
+    /// </summary>
+    public void DetachFromSyncScheduler() => _syncScheduler.StatusChanged -= _syncStatusHandler;
 
     private void Refresh(string? reselectId = null)
     {

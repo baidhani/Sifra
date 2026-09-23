@@ -45,10 +45,11 @@
             <ui:Button x:Name="MigrateSyncProviderButton" Content="Migrate to a different provider..." HorizontalAlignment="Left" Margin="0,0,0,20" Click="OnMigrateSyncProviderClick"/>
 
             <ui:TextBlock Text="Startup" FontTypography="BodyStrong" Margin="0,0,0,6"/>
-            <ui:TextBlock Text="Closing the window minimizes Sifra to the system tray instead of exiting — background sync keeps running until you Exit from the tray icon."
+            <ui:TextBlock Text="The tray icon appears as soon as Sifra starts and stays until it exits. Closing to tray (instead of exiting) needs the tray icon, so the two are linked below."
                           FontTypography="Caption" Foreground="{DynamicResource Sifra.TextSecondaryBrush}" Margin="0,0,0,10" TextWrapping="Wrap"/>
             <CheckBox x:Name="StartWithWindowsCheckBox" Content="Start Sifra automatically when Windows starts" Margin="0,0,0,10"/>
-            <CheckBox x:Name="KeepTrayIconVisibleCheckBox" Content="Keep the tray icon visible after restoring the window"/>
+            <CheckBox x:Name="ShowTrayIconCheckBox" Content="Show tray icon" Margin="0,0,0,10" Checked="OnShowTrayIconChanged" Unchecked="OnShowTrayIconChanged"/>
+            <CheckBox x:Name="CloseToTrayCheckBox" Content="Close to system tray instead of exiting" Checked="OnCloseToTrayChanged"/>
         </StackPanel>
         </ScrollViewer>
 
