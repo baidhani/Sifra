@@ -329,6 +329,17 @@ public partial class MainWindow : FluentWindow
     // ever become visible. WindowState must be reset first.
     private void BringToForeground()
     {
+        // Show() first — this never previously handled the "closed/hidden
+        // to tray" case (MinimizeToTray calls Hide(), not just minimize),
+        // only the minimized-to-taskbar case below. Activate() alone does
+        // nothing for a genuinely Hidden window, so a pairing request
+        // arriving while the app sat in the tray never actually surfaced
+        // it — confirmed live by sending a pairing request straight to the
+        // pipe while hidden and observing the window/foreground state never
+        // changed. Matches the same Show()-then-minimized-check-then-
+        // Activate() sequence RestoreFromTray() already uses correctly.
+        Show();
+
         if (WindowState == WindowState.Minimized)
         {
             WindowState = WindowState.Normal;
@@ -422,7 +433,12 @@ public partial class MainWindow : FluentWindow
         // toward a second auto-lock.
         _idleLockMonitor.Stop();
         _isUnlocked = false;
-        SetUnlockWindowSize();
+        // A pairing request can already be pending by the time this runs
+        // (e.g. it arrived while the app was still unlocked, and this
+        // ShowUnlock() call is from an idle timeout/explicit Lock right
+        // after) — size for the notice from the start rather than sizing
+        // small and then immediately having to grow.
+        SetUnlockWindowSize(HasPendingPairingRequest);
 
         // Every path that reaches ShowUnlock (explicit Lock, idle timeout,
         // LockRequested) must detach VaultView's sync-status subscription —
@@ -448,7 +464,15 @@ public partial class MainWindow : FluentWindow
             PairingRequestStateChanged -= _currentUnlockViewPairingHandler;
         }
         unlockView.SetPairingNoticeVisible(HasPendingPairingRequest);
-        _currentUnlockViewPairingHandler = (_, hasPending) => unlockView.SetPairingNoticeVisible(hasPending);
+        _currentUnlockViewPairingHandler = (_, hasPending) =>
+        {
+            unlockView.SetPairingNoticeVisible(hasPending);
+            // Grows the window to fit the notice + Deny button rather than
+            // letting them clip past the bottom edge — see
+            // SetUnlockWindowSize's remarks. Shrinks back the moment the
+            // request resolves (approved, denied, or timed out).
+            SetUnlockWindowSize(hasPending, recenter: false);
+        };
         PairingRequestStateChanged += _currentUnlockViewPairingHandler;
         unlockView.DenyPairingRequested += (_, _) => PairingDeniedFromLockScreen?.Invoke(this, EventArgs.Empty);
 
@@ -494,7 +518,7 @@ public partial class MainWindow : FluentWindow
     // the window larger than what the child actually arranges to, leaving a
     // gap. A fixed size gives Stretch a real, finite target to fill from the
     // first layout pass, so the card always matches the window exactly.
-    private void ApplyCompactWindowChrome(double width, double height)
+    private void ApplyCompactWindowChrome(double width, double height, bool centerOnScreen = true)
     {
         MinWidth = width;
         MinHeight = height;
@@ -517,7 +541,11 @@ public partial class MainWindow : FluentWindow
         // after fixing ResizeMode — None renders flush, matching the
         // Add/Edit dialog which never had this backdrop in the first place.
         WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType.None;
-        CenterOnScreen();
+
+        if (centerOnScreen)
+        {
+            CenterOnScreen();
+        }
     }
 
     private void SetSetupWindowSize()
@@ -533,7 +561,15 @@ public partial class MainWindow : FluentWindow
         ApplyCompactWindowChrome(480, 560);
     }
 
-    private void SetUnlockWindowSize()
+    // Rough measure of the pairing notice's own height (Border margin/padding
+    // + ~2 lines of wrapped caption text + the Deny button), plus slack —
+    // the shrunk 460px Unlock height fits the base password form exactly,
+    // with no room left for the notice on top of it once one arrives. Tune
+    // this the same way the base height was tuned (UI Automation
+    // measurement) if the notice text ever changes enough to reflow.
+    private const double PairingNoticeExtraHeight = 130;
+
+    private void SetUnlockWindowSize(bool pairingNoticeVisible = false, bool recenter = true)
     {
         // 100px narrower and 100px shorter than Setup's 480x560 (four rounds
         // of reduction, per explicit request) — re-verify UnlockView's
@@ -543,7 +579,21 @@ public partial class MainWindow : FluentWindow
         // gaps) at 540, 500, and 460. Width has 380 - 64 (card padding) =
         // 316px available; UnlockView's content StackPanel is 276px wide,
         // comfortably inside that, so no clipping risk there.
-        ApplyCompactWindowChrome(380, 460);
+        //
+        // Grows taller (see PairingNoticeExtraHeight) whenever a pairing
+        // request's notice is showing — the compact 460px height only fits
+        // the base password form, not the form plus the notice and its Deny
+        // button, which used to clip past the bottom edge.
+        //
+        // recenter=false is used when the Unlock screen is already visible
+        // and a pairing request arrives/clears live (see
+        // PairingRequestStateChanged handler in ShowUnlock) — recentering
+        // mid-session yanks the window to screen-center at the exact moment
+        // focus is trying to move to it, which put it behind the browser
+        // window that triggered the request. Only the initial transition
+        // into the Unlock screen should recenter.
+        var height = 460 + (pairingNoticeVisible ? PairingNoticeExtraHeight : 0);
+        ApplyCompactWindowChrome(380, height, recenter);
     }
 
     private void SetShellWindowSize()

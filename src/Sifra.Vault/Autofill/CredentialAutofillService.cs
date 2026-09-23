@@ -7,8 +7,17 @@ namespace Sifra.Vault.Autofill;
 /// Decides which credentials to offer for a page, and fills only with
 /// explicit consent. Reuses CredentialService/VaultEncryptionService
 /// unmodified — this is a thin decision layer, not a new storage/crypto
-/// path. Domain matching is intentionally simple (exact host match, no
-/// public-suffix-list heuristics) for this walking skeleton.
+/// path. Domain matching compares registrable domains (see
+/// <see cref="GetRegistrableDomain"/>), not raw hosts — so a credential
+/// stored against "www.example.com" also matches "login.example.com" or
+/// bare "example.com". This deliberately does NOT match across genuinely
+/// different registrable domains (e.g. a credential stored against
+/// "microsoft.com" will not match "login.microsoftonline.com" — that's a
+/// different organization-controlled domain as far as this comparison is
+/// concerned, even though both happen to belong to Microsoft; the fix for
+/// that case is storing an additional Website field with the actual sign-in
+/// host, which HasMatchingWebsiteField already supports since it checks
+/// every Website field via Any()).
 /// </summary>
 public sealed class CredentialAutofillService
 {
@@ -72,11 +81,52 @@ public sealed class CredentialAutofillService
             .ToList();
     }
 
-    private static bool HasMatchingWebsiteField(CredentialView credential, string host) =>
-        credential.Fields
+    private static bool HasMatchingWebsiteField(CredentialView credential, string host)
+    {
+        var registrableDomain = GetRegistrableDomain(host);
+        return credential.Fields
             .Where(f => f.Type == CustomFieldType.Website)
-            .Any(f => string.Equals(GetHost(f.Value), host, StringComparison.OrdinalIgnoreCase));
+            .Any(f => string.Equals(GetRegistrableDomain(GetHost(f.Value)), registrableDomain, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static string GetHost(string url) =>
         Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : url;
+
+    // Multi-part public suffixes where the registrable domain needs three
+    // labels instead of two (e.g. "example.co.uk", not just "co.uk" — the
+    // latter would wrongly treat every unrelated *.co.uk site as the same
+    // domain). This is a small, curated subset of the Mozilla Public Suffix
+    // List covering the common cases, not the full ~2400-entry list — no
+    // network fetch or new dependency for what's otherwise a niche case
+    // among the sites Sifra's users are likely to store credentials for.
+    // Revisit with a real PSL library if a user hits a suffix missing here.
+    private static readonly HashSet<string> MultiPartSuffixes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "co.uk", "org.uk", "gov.uk", "ac.uk", "sch.uk", "me.uk", "net.uk",
+        "co.jp", "co.nz", "co.za", "co.in", "co.kr", "co.il",
+        "com.au", "net.au", "org.au", "com.br", "com.cn", "com.mx", "com.sg", "com.hk", "com.tw",
+    };
+
+    /// <summary>
+    /// The organization-owned part of a host — "login.example.com" and
+    /// "www.example.com" both reduce to "example.com". Hosts with fewer
+    /// than two labels (bare hostnames, IP addresses) are returned as-is,
+    /// since there's nothing to strip.
+    /// </summary>
+    private static string GetRegistrableDomain(string host)
+    {
+        var labels = host.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (labels.Length <= 2)
+        {
+            return host;
+        }
+
+        var lastTwo = string.Join('.', labels[^2..]);
+        if (MultiPartSuffixes.Contains(lastTwo))
+        {
+            return labels.Length >= 3 ? string.Join('.', labels[^3..]) : host;
+        }
+
+        return lastTwo;
+    }
 }

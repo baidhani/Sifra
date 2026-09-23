@@ -48,6 +48,53 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     }
 
     [Fact]
+    public void OfferCredentialsForUrl_ForASubdomainOfTheStoredHost_OffersIt()
+    {
+        // A credential stored against "github.com" should also match
+        // "login.github.com" — same organization, different subdomain. Two
+        // hosts differing only by "www." or a subdomain used to be treated
+        // as entirely unrelated sites under the old exact-host-match rule.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        var service = new CredentialAutofillService(credentials);
+
+        var offered = service.OfferCredentialsForUrl(VaultCredential, "https://login.github.com/session");
+
+        Assert.Single(offered);
+    }
+
+    [Fact]
+    public void OfferCredentialsForUrl_ForACompletelyDifferentRegistrableDomain_OffersNothing()
+    {
+        // "login.microsoftonline.com" is a real-world case: a different
+        // registrable domain from "microsoft.com" even though both belong
+        // to Microsoft. Subdomain matching must not treat unrelated
+        // organization-controlled domains as the same site.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "Microsoft", LoginFields("firas", "hunter2", "https://www.microsoft.com"));
+        var service = new CredentialAutofillService(credentials);
+
+        var offered = service.OfferCredentialsForUrl(VaultCredential, "https://login.microsoftonline.com/common/oauth2");
+
+        Assert.Empty(offered);
+    }
+
+    [Fact]
+    public void OfferCredentialsForUrl_ForAMultiPartPublicSuffix_DoesNotTreatUnrelatedCoUkSitesAsTheSame()
+    {
+        // A naive "last two labels" registrable-domain rule would reduce
+        // both of these to "co.uk" and wrongly match them — co.uk is a
+        // public suffix (like .com), not anyone's actual domain.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "SiteA", LoginFields("firas", "hunter2", "https://www.sitea.co.uk"));
+        var service = new CredentialAutofillService(credentials);
+
+        var offered = service.OfferCredentialsForUrl(VaultCredential, "https://siteb.co.uk/login");
+
+        Assert.Empty(offered);
+    }
+
+    [Fact]
     public void OfferCredentialsForUrl_WithNoMatchingCredential_OffersNothing()
     {
         var credentials = CreateCredentialService();

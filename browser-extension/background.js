@@ -31,6 +31,27 @@ const DEVICE_INVALID_ERRORS = new Set([
   "DeviceRevokedException",
 ]);
 
+// Toolbar badge shows how many saved credentials match the current tab's
+// page, so a multi-credential site (see content.js's picker) is visible
+// before ever opening the popup or a login form's consent banner.
+const BADGE_COLOR = "#2563eb";
+
+function setMatchBadge(tabId, count) {
+  if (typeof tabId !== "number") return;
+  chrome.action.setBadgeBackgroundColor({ tabId, color: BADGE_COLOR });
+  chrome.action.setBadgeText({ tabId, text: count > 0 ? String(count) : "" });
+}
+
+// Cleared on every navigation start, not just overwritten on the next
+// DISCOVER response — a page with no login form at all never sends DISCOVER,
+// so without this the badge from the previous page in this tab would stick
+// around forever.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading") {
+    setMatchBadge(tabId, 0);
+  }
+});
+
 let nativePort = null;
 // Sifra.NativeHost processes one full request/response cycle per loop
 // iteration (see Program.cs) — no concurrency on its side — so responses
@@ -101,7 +122,7 @@ function sendDeviceRequest(action, extraFields) {
   });
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "STATUS") {
     Promise.all([getPairedDevice(), getVaultPassword()]).then(([device, password]) => {
       sendResponse({ ok: true, paired: device !== null, unlocked: password !== null });
@@ -166,7 +187,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, needsUnlock: true });
         return;
       }
-      sendDeviceRequest("discover", { vaultCredential: vaultPassword, url: message.url }).then(sendResponse);
+      sendDeviceRequest("discover", { vaultCredential: vaultPassword, url: message.url }).then((response) => {
+        setMatchBadge(sender.tab?.id, response.ok ? response.credentials.length : 0);
+        sendResponse(response);
+      });
     });
     return true; // keep the message channel open for the async response
   }

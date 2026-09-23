@@ -4,13 +4,152 @@
   <meta charset="utf-8" />
   <title>Sifra Vault</title>
   <style>
-    body { font: 14px system-ui, sans-serif; width: 240px; padding: 12px; }
-    input { width: 100%; box-sizing: border-box; padding: 6px; margin-bottom: 8px; }
-    button { width: 100%; padding: 6px; cursor: pointer; }
-    #status { margin-top: 8px; font-size: 12px; }
+    :root {
+      --brand-blue: #2563eb;
+      --text-dim: #6b7280;
+      --border: #e5e7eb;
+      --text: #111827;
+      --bg: #ffffff;
+      --surface: #f3f4f6;
+      --surface-hover: #e5e7eb;
+      --success: #15803d;
+      --error: #b91c1c;
+      --warning: #b45309;
+    }
+    /* Follows the OS/browser's own dark-mode setting — the cheap, no-plumbing
+       way to theme this popup. It does NOT read Sifra Desktop's own
+       Light/Dark/System preference (that would need a native-messaging round
+       trip to ask the desktop app, which isn't worth it purely for the
+       popup's colors — see this session's discussion, 2026-09-23). */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --text-dim: #9ca3af;
+        --border: #374151;
+        --text: #f3f4f6;
+        --bg: #1f2937;
+        --surface: #374151;
+        --surface-hover: #4b5563;
+        --success: #4ade80;
+        --error: #f87171;
+        --warning: #fbbf24;
+      }
+    }
+    body {
+      font: 14px system-ui, sans-serif;
+      width: 260px;
+      margin: 0;
+      padding: 16px;
+      color: var(--text);
+      background: var(--bg);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    header img { width: 24px; height: 24px; }
+    header span { font-size: 15px; font-weight: 600; }
+    p { margin: 0 0 10px; color: var(--text-dim); line-height: 1.4; }
+    label { display: block; margin-bottom: 4px; color: var(--text-dim); font-size: 12px; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 8px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font: inherit;
+    }
+    button {
+      width: 100%;
+      padding: 8px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      font: inherit;
+      font-weight: 500;
+      background: var(--brand-blue);
+      color: #fff;
+    }
+    button:disabled { opacity: .6; cursor: default; }
+    button.secondary { background: transparent; color: var(--text-dim); margin-top: 6px; }
+    .unlockedHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .unlockedHeader span { font-size: 12px; color: var(--text-dim); }
+    .iconButton {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .iconButton:hover { background: var(--surface-hover); }
+    #matchesList { display: flex; flex-direction: column; gap: 2px; margin: 0 -4px; }
+    .matchRow {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 6px;
+    }
+    .matchRow:hover { background: var(--surface); }
+    .matchMain {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      text-align: left;
+      background: transparent;
+      color: var(--text);
+      padding: 4px;
+      border-radius: 6px;
+    }
+    .matchLabel { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .matchUsername { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .matchUsername.empty { color: var(--warning); }
+    .copyButton {
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: var(--text-dim);
+    }
+    .copyButton:hover { background: var(--surface-hover); color: var(--text); }
+    .copyButton:disabled { opacity: .4; }
+    #status {
+      margin-top: 10px;
+      font-size: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+      min-height: 14px;
+    }
+    #status .icon { flex-shrink: 0; margin-top: 1px; }
+    #status.success { color: var(--success); }
+    #status.error { color: var(--error); }
+    #status.info { color: var(--text-dim); }
   </style>
 </head>
 <body>
+  <header>
+    <img src="icons/symbol128.png" alt="Sifra" />
+    <span>Sifra Vault</span>
+  </header>
   <div id="unpairedView">
     <p>Connect this browser to Sifra Desktop to enable autofill.</p>
     <button id="pairButton">Pair with Desktop</button>
@@ -21,8 +160,17 @@
     <button id="unlockButton">Unlock for this session</button>
   </div>
   <div id="unlockedView" hidden>
-    <p>Vault unlocked for this browser session.</p>
-    <button id="lockButton">Lock now</button>
+    <div class="unlockedHeader">
+      <span>Unlocked until browser restart</span>
+      <button id="lockButton" class="iconButton" title="Lock vault" aria-label="Lock vault">
+        <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+          <rect x="4.5" y="9" width="11" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+          <path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </button>
+    </div>
+    <p id="matchesEmpty">Visit a saved login page to see autofill.</p>
+    <div id="matchesList" hidden></div>
   </div>
   <div id="status"></div>
   <script src="popup.js"></script>
