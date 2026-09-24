@@ -40,6 +40,48 @@
     });
   }
 
+  // Capture-on-submit, prompt-on-next-page-load (same pattern Chrome/
+  // Bitwarden use): grab whatever was typed the moment the form is
+  // submitted — before navigation actually happens and this script's DOM
+  // access to that page is gone — and hand it to background.js to hold
+  // until the resulting page has loaded. Capture phase (the `true` below)
+  // so this still fires even if the page's own JS calls
+  // stopPropagation() on the submit event.
+  document.addEventListener(
+    "submit",
+    (e) => {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement)) return;
+
+      const submittedPasswordInput = form.querySelector('input[type="password"]');
+      if (!submittedPasswordInput || !submittedPasswordInput.value) return;
+
+      const submittedUsernameInput = findUsernameInput(submittedPasswordInput);
+      const username = submittedUsernameInput ? submittedUsernameInput.value : "";
+      if (!username) return; // nothing meaningful to offer to save without a username
+
+      chrome.runtime.sendMessage({
+        type: "CAPTURE_LOGIN",
+        url: location.href,
+        username,
+        password: submittedPasswordInput.value,
+      });
+    },
+    true
+  );
+
+  // Runs on every page load, in every tab — a no-op unless a login form was
+  // just submitted in this same tab a moment ago (see the submit listener
+  // above and background.js's pending-capture storage). This is why it's
+  // unconditional rather than gated behind `if (passwordInput)`: the page
+  // you land on *after* logging in (a dashboard, say) almost never has a
+  // password field itself.
+  chrome.runtime.sendMessage({ type: "CHECK_PENDING_CAPTURE" }, (response) => {
+    if (response && response.ok) {
+      showSaveOrUpdateBanner(response);
+    }
+  });
+
   function findUsernameInput(pwInput) {
     const form = pwInput.closest("form") || document;
     const candidates = form.querySelectorAll('input[type="text"], input[type="email"], input:not([type])');
@@ -74,7 +116,7 @@
   function showToast(text) {
     const banner = document.createElement("div");
     banner.style.cssText =
-      "position:fixed;top:12px;right:12px;z-index:2147483647;background:#1f2937;color:#fff;" +
+      "position:fixed;top:12px;right:12px;z-index:2147483647;background:#1e1e1e;color:#fff;" +
       "font:14px system-ui,sans-serif;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);" +
       "padding:10px 14px;display:flex;align-items:center;gap:10px;min-width:220px;max-width:320px;";
 
@@ -89,6 +131,150 @@
     banner.append(logo, label);
     document.body.appendChild(banner);
     setTimeout(() => banner.remove(), 6000);
+  }
+
+  function makeField(labelText, value, type) {
+    const wrapper = document.createElement("label");
+    wrapper.style.cssText = "display:flex;flex-direction:column;gap:3px;font-size:12px;color:#9ca3af;";
+
+    const input = document.createElement("input");
+    input.type = type;
+    input.value = value;
+    input.style.cssText =
+      "background:#141414;color:#fff;border:1px solid #3a3a3a;border-radius:6px;padding:6px 8px;font:14px system-ui,sans-serif;";
+
+    wrapper.append(labelText, input);
+    return { wrapper, input };
+  }
+
+  const EYE_ICON =
+    '<svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.3" stroke="currentColor" stroke-width="1.5"/></svg>';
+  const EYE_OFF_ICON =
+    '<svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.3" stroke="currentColor" stroke-width="1.5"/><path d="M3 3l14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+
+  // Masked by default — this field previously showed the plaintext password
+  // in the open on the page (a shoulder-surfing/screen-recording exposure),
+  // with no way to hide it back once shown.
+  function makePasswordField(labelText, value) {
+    const { wrapper, input } = makeField(labelText, value, "password");
+    input.style.paddingRight = "30px";
+
+    const inputRow = document.createElement("div");
+    inputRow.style.cssText = "position:relative;display:flex;";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.innerHTML = EYE_ICON;
+    toggle.title = "Show password";
+    toggle.setAttribute("aria-label", "Show password");
+    toggle.style.cssText =
+      "position:absolute;right:4px;top:50%;transform:translateY(-50%);background:transparent;border:none;" +
+      "color:#9ca3af;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;width:auto;";
+    toggle.addEventListener("click", () => {
+      const revealed = input.type === "text";
+      input.type = revealed ? "password" : "text";
+      toggle.innerHTML = revealed ? EYE_ICON : EYE_OFF_ICON;
+      toggle.title = revealed ? "Show password" : "Hide password";
+    });
+
+    // Re-parent input under inputRow so the toggle can sit inside it
+    // without disturbing the label text already appended by makeField.
+    wrapper.removeChild(input);
+    inputRow.appendChild(input);
+    inputRow.appendChild(toggle);
+    wrapper.appendChild(inputRow);
+
+    return { wrapper, input };
+  }
+
+  // Save-new / update-changed password prompt — shown once per captured
+  // form submission (see the submit listener and CHECK_PENDING_CAPTURE
+  // above). Editable fields rather than a plain "Save?" confirmation, so a
+  // wrong guess at the label/username (e.g. this content script grabbed the
+  // wrong field as "username") can be corrected before it's written to the
+  // vault, instead of having to go fix it in Sifra Desktop afterward.
+  function showSaveOrUpdateBanner(capture) {
+    const isNew = capture.status === "New";
+    const host = (() => {
+      try {
+        return new URL(capture.url).hostname;
+      } catch {
+        return capture.url;
+      }
+    })();
+
+    const banner = document.createElement("div");
+    banner.id = "sifra-save-banner";
+    banner.style.cssText =
+      "position:fixed;top:12px;right:12px;z-index:2147483647;background:#1e1e1e;color:#fff;" +
+      "font:14px system-ui,sans-serif;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.35);" +
+      "padding:14px;display:flex;flex-direction:column;gap:10px;width:260px;";
+
+    const header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;gap:8px;font-weight:600;";
+    const logo = document.createElement("img");
+    logo.src = LOGO_URL;
+    logo.alt = "Sifra";
+    logo.style.cssText = "width:18px;height:18px;flex-shrink:0;border-radius:4px;";
+    const headerText = document.createElement("span");
+    headerText.textContent = isNew ? "Save this password?" : "Update saved password?";
+    header.append(logo, headerText);
+    banner.appendChild(header);
+
+    let labelField, usernameField, passwordField;
+    if (isNew) {
+      labelField = makeField("Label", host, "text");
+      usernameField = makeField("Username", capture.username, "text");
+      passwordField = makePasswordField("Password", capture.password);
+      banner.append(labelField.wrapper, usernameField.wrapper, passwordField.wrapper);
+    } else {
+      const info = document.createElement("div");
+      info.style.cssText = "font-size:13px;color:#d1d5db;";
+      info.textContent = `"${capture.existingLabel}" — new password:`;
+      passwordField = makePasswordField("Password", capture.password);
+      banner.append(info, passwordField.wrapper);
+    }
+
+    const buttons = document.createElement("div");
+    buttons.style.cssText = "display:flex;gap:8px;margin-top:2px;";
+
+    const primaryButton = document.createElement("button");
+    primaryButton.textContent = isNew ? "Save" : "Update";
+    primaryButton.style.cssText =
+      "flex:1;background:#2563eb;color:#fff;border:none;border-radius:999px;padding:9px;cursor:pointer;font:inherit;font-weight:500;";
+    primaryButton.addEventListener("click", () => {
+      primaryButton.disabled = true;
+      primaryButton.textContent = "Saving...";
+
+      const message = isNew
+        ? {
+            type: "SAVE_CAPTURED_LOGIN",
+            label: labelField.input.value,
+            url: capture.url,
+            username: usernameField.input.value,
+            password: passwordField.input.value,
+          }
+        : {
+            type: "UPDATE_CAPTURED_LOGIN",
+            credentialId: capture.credentialId,
+            password: passwordField.input.value,
+          };
+
+      chrome.runtime.sendMessage(message, (response) => {
+        banner.remove();
+        showToast(response && response.ok ? "Sifra: saved." : "Sifra: couldn't save — try again from the vault.");
+      });
+    });
+
+    const dismissButton = document.createElement("button");
+    dismissButton.textContent = "Not now";
+    dismissButton.style.cssText =
+      "background:transparent;color:#cbd5e1;border:none;border-radius:999px;cursor:pointer;font:inherit;padding:9px;";
+    dismissButton.addEventListener("click", () => banner.remove());
+
+    buttons.append(primaryButton, dismissButton);
+    banner.appendChild(buttons);
+    document.body.appendChild(banner);
   }
 
   // React (and similar frameworks) wrap <input> in a controlled component:

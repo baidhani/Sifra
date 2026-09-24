@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Sifra Test Dashboard</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; max-width: 320px; margin: 80px auto; }
+    a { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <h2>Welcome!</h2>
+  <p id="who"></p>
+  <p><a href="test-login-page.html">Log out</a></p>
+  <script>
+    // Deliberately has no password field — same as a real post-login
+    // dashboard — so this page exercises the extension's
+    // CHECK_PENDING_CAPTURE / save-or-update prompt path, not the
+    // fill/discover path.
+    const username = sessionStorage.getItem("sifra-test-username") || "unknown user";
+    document.getElementById("who").textContent = "Logged in as " + username + ".";
+  </script>
+</body>
+</html>

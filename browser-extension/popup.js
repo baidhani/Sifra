@@ -75,9 +75,9 @@ function copyToClipboard(text) {
 // twice) so which button copies what is visible at a glance, not just via
 // the tooltip.
 const COPY_USERNAME_ICON =
-  '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  '<svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.9"/><path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 const COPY_PASSWORD_ICON =
-  '<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="10" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M9.8 10h7.2M13.5 10v3M16 10v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>';
+  '<svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="10" r="3" stroke="currentColor" stroke-width="1.9"/><path d="M9.8 10h7.2M13.5 10v3M16 10v2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 
 function makeCopyButton(title, icon, onClick) {
   const button = document.createElement("button");

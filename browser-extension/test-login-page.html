@@ -11,10 +11,30 @@
 <body>
   <h2>Test Login</h2>
   <p>STORY-010 live verification page. Served locally on port 8787 so its origin matches a seeded test credential's stored URL exactly (domain matching in this walking skeleton is exact-host only).</p>
-  <form>
+  <form id="login-form">
     <input type="text" name="username" placeholder="Username" />
     <input type="password" name="password" placeholder="Password" />
     <button type="submit">Log in</button>
   </form>
+  <script>
+    // Mimics a real login: submit fires (so the extension's capture-on-submit
+    // listener still sees it — preventDefault() here only stops the browser's
+    // own default navigation, not other listeners on the same event), then a
+    // short delay before redirecting to a separate "logged in" page. That
+    // second-page navigation is what triggers the extension's
+    // CHECK_PENDING_CAPTURE / save-or-update prompt, same as it would after a
+    // real site's login POST redirects you to a dashboard.
+    document.getElementById("login-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const username = document.querySelector('input[name="username"]').value;
+      sessionStorage.setItem("sifra-test-username", username);
+      const button = e.target.querySelector('button[type="submit"]');
+      button.textContent = "Logging in...";
+      button.disabled = true;
+      setTimeout(() => {
+        location.href = "test-dashboard.html";
+      }, 400);
+    });
+  </script>
 </body>
 </html>

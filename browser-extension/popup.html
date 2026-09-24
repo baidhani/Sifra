@@ -21,14 +21,19 @@
        Light/Dark/System preference (that would need a native-messaging round
        trip to ask the desktop app, which isn't worth it purely for the
        popup's colors — see this session's discussion, 2026-09-23). */
+    /* Neutral near-black, not the earlier blue-tinted dark gray (#1f2937) —
+       matching Chrome's own save-password dialog. A background sharing the
+       accent's blue hue made the brand-blue buttons/icons compete with it
+       instead of standing out against it; a neutral background lets the
+       one accent color read cleanly (2026-09-23 design pass). */
     @media (prefers-color-scheme: dark) {
       :root {
-        --text-dim: #9ca3af;
-        --border: #374151;
+        --text-dim: #9a9a9a;
+        --border: #3a3a3a;
         --text: #f3f4f6;
-        --bg: #1f2937;
-        --surface: #374151;
-        --surface-hover: #4b5563;
+        --bg: #1e1e1e;
+        --surface: #2a2a2a;
+        --surface-hover: #3a3a3a;
         --success: #4ade80;
         --error: #f87171;
         --warning: #fbbf24;
@@ -42,14 +47,24 @@
       color: var(--text);
       background: var(--bg);
     }
+    /* Full-bleed shaded bar (negative margin cancels body's own padding) so
+       the fixed logo/title row reads as a distinct header sitting above the
+       scrolling match list below it, rather than blending into the body
+       background the list scrolls underneath. */
     header {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 14px;
+      margin: -16px -16px 0 -16px;
+      padding: 14px 16px 6px 16px;
+      background: var(--surface);
     }
     header img { width: 24px; height: 24px; }
     header span { font-size: 15px; font-weight: 600; }
+    /* #unlockedView's own header row (below) continues this same shaded
+       bar with no gap; the other two views just need the space back that
+       header's own margin-bottom used to provide. */
+    #unpairedView, #lockedView { margin-top: 14px; }
     p { margin: 0 0 10px; color: var(--text-dim); line-height: 1.4; }
     label { display: block; margin-bottom: 4px; color: var(--text-dim); font-size: 12px; }
     input {
@@ -60,13 +75,18 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       font: inherit;
+      /* Text inputs default to a browser-native white fill regardless of
+         page theme unless explicitly overridden — left unset, this showed
+         a bright white box in the middle of an otherwise dark popup. */
+      background: var(--surface);
+      color: var(--text);
     }
     button {
       width: 100%;
-      padding: 8px;
+      padding: 10px;
       cursor: pointer;
       border: none;
-      border-radius: 6px;
+      border-radius: 999px;
       font: inherit;
       font-weight: 500;
       background: var(--brand-blue);
@@ -78,7 +98,10 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
+      margin: 0 -16px 10px -16px;
+      padding: 4px 16px 14px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
     .unlockedHeader span { font-size: 12px; color: var(--text-dim); }
     .iconButton {
@@ -91,9 +114,31 @@
       justify-content: center;
       background: var(--surface);
       color: var(--text);
+      border-radius: 50%;
     }
     .iconButton:hover { background: var(--surface-hover); }
-    #matchesList { display: flex; flex-direction: column; gap: 2px; margin: 0 -4px; }
+    /* Chrome caps a popup's own height (~600px) and clips anything past
+       that with no way to reach it — no scrollbar appears on its own. This
+       scrolls the match list itself once it grows past a sane size, well
+       before hitting Chrome's hard cap, so the header/lock button/status
+       line stay reachable and a long list is still fully browsable. */
+    #matchesList {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 0 -4px;
+      max-height: 280px;
+      overflow-y: auto;
+      scrollbar-color: var(--surface-hover) transparent;
+      scrollbar-width: thin;
+    }
+    /* scrollbar-color above covers Firefox; Chrome (what this extension
+       actually runs in) still needs the older WebKit pseudo-elements to
+       theme the scrollbar instead of showing the OS default. */
+    #matchesList::-webkit-scrollbar { width: 8px; }
+    #matchesList::-webkit-scrollbar-track { background: transparent; }
+    #matchesList::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 4px; }
+    #matchesList::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
     .matchRow {
       display: flex;
       align-items: center;
@@ -113,7 +158,7 @@
       background: transparent;
       color: var(--text);
       padding: 4px;
-      border-radius: 6px;
+      border-radius: 8px; /* a normal list row, not a pill CTA button — overrides the global button rule */
     }
     .matchLabel { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
     .matchUsername { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
@@ -128,6 +173,15 @@
       justify-content: center;
       background: transparent;
       color: var(--text-dim);
+      /* Hidden until the row is hovered/focused (below) — showing both copy
+         icons on every row at once was visual clutter for actions most
+         rows won't need at any given moment. */
+      opacity: 0;
+      transition: opacity .1s ease;
+    }
+    .matchRow:hover .copyButton,
+    .matchRow:focus-within .copyButton {
+      opacity: 1;
     }
     .copyButton:hover { background: var(--surface-hover); color: var(--text); }
     .copyButton:disabled { opacity: .4; }

@@ -192,6 +192,83 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     }
 
     [Fact]
+    public void CheckCapturedLogin_ForAnUnknownUsername_ReportsNew()
+    {
+        // Acceptance: a username not in the vault is offered as "save new".
+        var credentials = CreateCredentialService();
+        var service = CreateServiceOn(credentials);
+
+        var check = service.CheckCapturedLogin(VaultCredential, "https://example.com/login", "new-user", "hunter2");
+
+        Assert.Equal(CapturedLoginStatus.New, check.Status);
+        Assert.Null(check.CredentialId);
+    }
+
+    [Fact]
+    public void CheckCapturedLogin_ForAMatchingUsernameAndPassword_ReportsUnchanged()
+    {
+        // Acceptance: re-submitting exactly what's already saved offers nothing.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "Example", LoginFields("firas", "hunter2", "https://example.com"));
+        var service = CreateServiceOn(credentials);
+
+        var check = service.CheckCapturedLogin(VaultCredential, "https://example.com/login", "firas", "hunter2");
+
+        Assert.Equal(CapturedLoginStatus.Unchanged, check.Status);
+    }
+
+    [Fact]
+    public void CheckCapturedLogin_ForAMatchingUsernameWithADifferentPassword_ReportsDifferent()
+    {
+        // Acceptance: a changed password for a known username is offered as "update".
+        var credentials = CreateCredentialService();
+        var id = credentials.Add(VaultCredential, "Example", LoginFields("firas", "old-password", "https://example.com"));
+        var service = CreateServiceOn(credentials);
+
+        var check = service.CheckCapturedLogin(VaultCredential, "https://example.com/login", "firas", "new-password");
+
+        Assert.Equal(CapturedLoginStatus.Different, check.Status);
+        Assert.Equal(id, check.CredentialId);
+        Assert.Equal("Example", check.ExistingLabel);
+    }
+
+    [Fact]
+    public void SaveCapturedLogin_CreatesACredentialThatThenMatchesTheSamePage()
+    {
+        // Acceptance: saving a captured login makes it discoverable/fillable afterward.
+        var credentials = CreateCredentialService();
+        var service = CreateServiceOn(credentials);
+
+        var id = service.SaveCapturedLogin(VaultCredential, "Example", "https://example.com/login", "firas", "hunter2");
+
+        var offered = service.OfferCredentialsForUrl(VaultCredential, "https://example.com/login");
+        Assert.Single(offered);
+        Assert.Equal(id, offered[0].Id);
+        Assert.Equal(CapturedLoginStatus.Unchanged,
+            service.CheckCapturedLogin(VaultCredential, "https://example.com/login", "firas", "hunter2").Status);
+    }
+
+    [Fact]
+    public void UpdateCapturedLoginPassword_ChangesOnlyThePasswordField()
+    {
+        // Failure path being guarded against: an update must not silently
+        // touch the label, username, or other metadata — only the password.
+        var credentials = CreateCredentialService();
+        var id = credentials.Add(VaultCredential, "Example", LoginFields("firas", "old-password", "https://example.com"), isFavorite: true);
+        var service = CreateServiceOn(credentials);
+
+        service.UpdateCapturedLoginPassword(VaultCredential, id, "new-password");
+
+        var updated = credentials.GetById(VaultCredential, id);
+        Assert.Equal("Example", updated.Label);
+        Assert.True(updated.IsFavorite);
+        Assert.Equal("firas", updated.Username());
+        Assert.Equal("new-password", updated.Password());
+    }
+
+    private static CredentialAutofillService CreateServiceOn(CredentialService credentials) => new(credentials);
+
+    [Fact]
     public void FillCredential_WhenConsentDenied_StillLogsTheDenial()
     {
         var credentials = CreateCredentialService();

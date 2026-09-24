@@ -52,6 +52,39 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   }
 });
 
+// Save/update-password flow: content.js captures a submitted login form's
+// values, then — once the *next* page in that tab finishes loading (see
+// CHECK_PENDING_CAPTURE below) — this decides whether to offer "save as
+// new" or "update the saved password", matching Chrome/Bitwarden's own
+// capture-on-submit-then-prompt-on-navigate pattern. Kept in
+// chrome.storage.session (memory-only, tab-scoped key) rather than a
+// module-level variable so it survives a service-worker restart between
+// the submit and the next page load.
+const PENDING_CAPTURE_PREFIX = "pendingCapture:";
+const PENDING_CAPTURE_MAX_AGE_MS = 3 * 60 * 1000;
+
+function setPendingCapture(tabId, capture) {
+  return chrome.storage.session.set({ [PENDING_CAPTURE_PREFIX + tabId]: { ...capture, capturedAt: Date.now() } });
+}
+
+function takePendingCapture(tabId) {
+  const key = PENDING_CAPTURE_PREFIX + tabId;
+  return chrome.storage.session.get(key).then((result) => {
+    const capture = result[key] ?? null;
+    chrome.storage.session.remove(key); // one-shot: never re-prompt from the same submit
+    if (!capture || Date.now() - capture.capturedAt > PENDING_CAPTURE_MAX_AGE_MS) {
+      return null;
+    }
+    return capture;
+  });
+}
+
+// A tab that closes with a pending capture (e.g. the user closed the tab
+// instead of the login redirecting) should not leave storage clutter behind.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(PENDING_CAPTURE_PREFIX + tabId);
+});
+
 let nativePort = null;
 // Sifra.NativeHost processes one full request/response cycle per loop
 // iteration (see Program.cs) — no concurrency on its side — so responses
@@ -206,6 +239,99 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         url: message.url,
         credentialId: message.credentialId,
         consent: true, // only ever sent in response to an explicit user click — see content.js
+      }).then(sendResponse);
+    });
+    return true;
+  }
+
+  // content.js calls this right after a login form is submitted (before
+  // navigation actually happens), capturing what was typed for the *next*
+  // page load in this same tab to check (see CHECK_PENDING_CAPTURE).
+  if (message.type === "CAPTURE_LOGIN") {
+    const tabId = sender.tab?.id;
+    if (typeof tabId !== "number") {
+      sendResponse({ ok: false });
+      return false;
+    }
+    setPendingCapture(tabId, { url: message.url, username: message.username, password: message.password }).then(() =>
+      sendResponse({ ok: true })
+    );
+    return true;
+  }
+
+  // content.js calls this once on every page load, asking "did I just
+  // submit a login form in this tab a moment ago, and if so, is it new or
+  // changed?" — a no-op on ordinary navigation (no pending capture).
+  if (message.type === "CHECK_PENDING_CAPTURE") {
+    const tabId = sender.tab?.id;
+    if (typeof tabId !== "number") {
+      sendResponse({ ok: false });
+      return false;
+    }
+
+    takePendingCapture(tabId).then((capture) => {
+      if (!capture) {
+        sendResponse({ ok: false });
+        return;
+      }
+
+      getVaultPassword().then((vaultPassword) => {
+        if (!vaultPassword) {
+          sendResponse({ ok: false });
+          return;
+        }
+        sendDeviceRequest("check", {
+          vaultCredential: vaultPassword,
+          url: capture.url,
+          username: capture.username,
+          password: capture.password,
+        }).then((response) => {
+          if (!response.ok || response.status === "Unchanged") {
+            sendResponse({ ok: false });
+            return;
+          }
+          sendResponse({
+            ok: true,
+            status: response.status, // "New" or "Different"
+            credentialId: response.credentialId,
+            existingLabel: response.existingLabel,
+            url: capture.url,
+            username: capture.username,
+            password: capture.password,
+          });
+        });
+      });
+    });
+    return true;
+  }
+
+  if (message.type === "SAVE_CAPTURED_LOGIN") {
+    getVaultPassword().then((vaultPassword) => {
+      if (!vaultPassword) {
+        sendResponse({ ok: false, needsUnlock: true });
+        return;
+      }
+      sendDeviceRequest("save", {
+        vaultCredential: vaultPassword,
+        label: message.label,
+        url: message.url,
+        username: message.username,
+        password: message.password,
+      }).then(sendResponse);
+    });
+    return true;
+  }
+
+  if (message.type === "UPDATE_CAPTURED_LOGIN") {
+    getVaultPassword().then((vaultPassword) => {
+      if (!vaultPassword) {
+        sendResponse({ ok: false, needsUnlock: true });
+        return;
+      }
+      sendDeviceRequest("update", {
+        vaultCredential: vaultPassword,
+        credentialId: message.credentialId,
+        password: message.password,
       }).then(sendResponse);
     });
     return true;

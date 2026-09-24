@@ -81,6 +81,77 @@ public sealed class CredentialAutofillService
             .ToList();
     }
 
+    /// <summary>
+    /// Compares a just-submitted username/password against what's already
+    /// saved for this page's domain, so the caller (the browser extension)
+    /// can offer to save a brand-new login or update a changed password —
+    /// without ever needing to hold the stored password itself just to make
+    /// that comparison; this does the decrypt-and-compare server-side.
+    /// Matches by username within domain, not by credential id: the
+    /// extension doesn't know which vault entry (if any) corresponds to
+    /// what the user just typed.
+    /// </summary>
+    public CapturedLoginCheck CheckCapturedLogin(string vaultCredential, string url, string username, string password)
+    {
+        var host = GetHost(url);
+        var existing = _credentials.List(vaultCredential)
+            .Where(c => HasMatchingWebsiteField(c, host))
+            .FirstOrDefault(c => string.Equals(LoginValue(c), username, StringComparison.Ordinal));
+
+        if (existing is null)
+        {
+            return new CapturedLoginCheck(CapturedLoginStatus.New, null, null);
+        }
+
+        return string.Equals(PasswordValue(existing), password, StringComparison.Ordinal)
+            ? new CapturedLoginCheck(CapturedLoginStatus.Unchanged, existing.Id, existing.Label)
+            : new CapturedLoginCheck(CapturedLoginStatus.Different, existing.Id, existing.Label);
+    }
+
+    /// <summary>
+    /// Creates a new credential from a captured login — the "save this
+    /// password?" path. Stores the page's own host (not the raw submitted
+    /// URL, which may carry a path/query the user never intended to save)
+    /// as the Website field, so future visits to the same site match it.
+    /// </summary>
+    public string SaveCapturedLogin(string vaultCredential, string label, string url, string username, string password)
+    {
+        var id = _credentials.Add(vaultCredential, label,
+        [
+            ("Username", username, CustomFieldType.Login),
+            ("Password", password, CustomFieldType.Password),
+            ("Website", $"https://{GetHost(url)}", CustomFieldType.Website),
+        ]);
+
+        _auditLogger?.Log(nameof(SaveCapturedLogin), Environment.UserName, details: $"id={id} outcome=saved");
+        return id;
+    }
+
+    /// <summary>
+    /// Updates only the Password field of an existing credential — the
+    /// "update the saved password?" path. Every other field (label,
+    /// username, tags, other custom fields) is preserved exactly.
+    /// </summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void UpdateCapturedLoginPassword(string vaultCredential, string credentialId, string password)
+    {
+        var existing = _credentials.GetById(vaultCredential, credentialId);
+        var fields = existing.Fields
+            .Select(f => f.Type == CustomFieldType.Password
+                ? (f.Name, password, f.Type)
+                : (f.Name, f.Value, f.Type))
+            .ToList();
+
+        _credentials.Edit(vaultCredential, credentialId, existing.Label, fields, existing.IsFavorite, existing.Tags);
+        _auditLogger?.Log(nameof(UpdateCapturedLoginPassword), Environment.UserName, details: $"id={credentialId} outcome=updated");
+    }
+
+    private static string LoginValue(CredentialView view) =>
+        view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Login)?.Value ?? string.Empty;
+
+    private static string PasswordValue(CredentialView view) =>
+        view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Password)?.Value ?? string.Empty;
+
     private static bool HasMatchingWebsiteField(CredentialView credential, string host)
     {
         var registrableDomain = GetRegistrableDomain(host);

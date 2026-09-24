@@ -147,20 +147,58 @@ static string HandleRequest(
             return JsonSerializer.Serialize(new { ok = true });
         }
 
-        var url = root.GetProperty("url").GetString()!;
-
+        // "url" is only fetched inside the actions that actually need one —
+        // "update" targets an existing credential by id and never sends a
+        // url at all (see background.js's UPDATE_CAPTURED_LOGIN), so
+        // fetching it unconditionally here used to throw before "update"
+        // ever got a chance to run.
         switch (action)
         {
             case "discover":
-                var offered = autofillService.OfferCredentialsForUrl(vaultCredential, url);
+                var discoverUrl = root.GetProperty("url").GetString()!;
+                var offered = autofillService.OfferCredentialsForUrl(vaultCredential, discoverUrl);
                 var payload = offered.Select(c => new { id = c.Id, label = c.Label, username = LoginValue(c) });
                 return JsonSerializer.Serialize(new { ok = true, credentials = payload });
 
             case "fill":
+                var fillUrl = root.GetProperty("url").GetString()!;
                 var credentialId = root.GetProperty("credentialId").GetString()!;
                 var consent = root.GetProperty("consent").GetBoolean();
-                var view = autofillService.FillCredential(vaultCredential, credentialId, url, consent);
+                var view = autofillService.FillCredential(vaultCredential, credentialId, fillUrl, consent);
                 return JsonSerializer.Serialize(new { ok = true, username = LoginValue(view), password = PasswordValue(view) });
+
+            // Save-password-prompt flow: the extension captures a submitted
+            // login form, then (after the resulting page loads) asks here
+            // whether it's new, matches what's already saved, or updates an
+            // existing entry's password — see CredentialAutofillService's
+            // own remarks on why this comparison happens server-side rather
+            // than handing the stored password to the extension.
+            case "check":
+                var checkUrl = root.GetProperty("url").GetString()!;
+                var capturedUsername = root.GetProperty("username").GetString()!;
+                var capturedPassword = root.GetProperty("password").GetString()!;
+                var check = autofillService.CheckCapturedLogin(vaultCredential, checkUrl, capturedUsername, capturedPassword);
+                return JsonSerializer.Serialize(new
+                {
+                    ok = true,
+                    status = check.Status.ToString(),
+                    credentialId = check.CredentialId,
+                    existingLabel = check.ExistingLabel,
+                });
+
+            case "save":
+                var saveUrl = root.GetProperty("url").GetString()!;
+                var saveLabel = root.GetProperty("label").GetString()!;
+                var saveUsername = root.GetProperty("username").GetString()!;
+                var savePassword = root.GetProperty("password").GetString()!;
+                var savedId = autofillService.SaveCapturedLogin(vaultCredential, saveLabel, saveUrl, saveUsername, savePassword);
+                return JsonSerializer.Serialize(new { ok = true, credentialId = savedId });
+
+            case "update":
+                var updateCredentialId = root.GetProperty("credentialId").GetString()!;
+                var updatePassword = root.GetProperty("password").GetString()!;
+                autofillService.UpdateCapturedLoginPassword(vaultCredential, updateCredentialId, updatePassword);
+                return JsonSerializer.Serialize(new { ok = true });
 
             default:
                 return JsonSerializer.Serialize(new { ok = false, error = "UnknownAction", message = $"Unknown action '{action}'." });
