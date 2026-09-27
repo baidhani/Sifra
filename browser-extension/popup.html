@@ -160,7 +160,13 @@
       padding: 4px;
       border-radius: 8px; /* a normal list row, not a pill CTA button — overrides the global button rule */
     }
-    .matchLabel { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+    .matchLabelRow { display: flex; align-items: center; gap: 4px; max-width: 100%; min-width: 0; }
+    .matchLabel { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    /* [hidden] must be re-asserted here — an author rule setting `display`
+       otherwise silently overrides the browser's own [hidden]{display:none}
+       (see the .matchDetails[hidden] rule above for the same pitfall). */
+    .autofillBadge[hidden] { display: none; }
+    .autofillBadge { flex-shrink: 0; display: flex; color: var(--brand-blue); }
     .matchUsername { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
     .matchUsername.empty { color: var(--warning); }
     .copyButton {
@@ -180,11 +186,51 @@
       transition: opacity .1s ease;
     }
     .matchRow:hover .copyButton,
-    .matchRow:focus-within .copyButton {
+    .matchRow:focus-within .copyButton,
+    .copyButton.expanded,
+    .copyButton.autofillOn {
       opacity: 1;
     }
     .copyButton:hover { background: var(--surface-hover); color: var(--text); }
     .copyButton:disabled { opacity: .4; }
+    /* An enabled auto-fill toggle stays visibly blue and always shown
+       (like .expanded) — its state is meaningful information, not just an
+       action waiting to be discovered on hover like the copy buttons. */
+    .copyButton.autofillOn { color: var(--brand-blue); }
+    .copyButton.autofillOn:hover { background: var(--brand-blue); color: #fff; }
+    .copyButton { transition: opacity .1s ease, transform .15s ease; }
+    /* Setting `display` on an element also has to account for its `hidden`
+       attribute — an author rule like `.matchDetails { display: flex }`
+       otherwise overrides the browser's own built-in `[hidden] { display:
+       none }` (author styles beat the UA default regardless of selector
+       specificity), so toggling `.hidden = true/false` in JS silently did
+       nothing and every panel rendered open from the start. */
+    .matchDetails[hidden] { display: none; }
+    .matchDetails {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px 8px 8px 8px;
+      margin: 0 4px 4px 4px;
+      border-top: 1px solid var(--border);
+    }
+    /* Wraps a row + its (collapsed, usually invisible) details panel. Only
+       visually distinct once expanded — a solid card with its own
+       background/border/accent stripe and breathing room from its
+       neighbors, so an open card reads clearly as "this one, expanded"
+       instead of its details panel just quietly appearing in the flow
+       looking like part of the list underneath it. */
+    .matchRowGroup { border-radius: 8px; }
+    .matchRowGroup.expanded {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--brand-blue);
+      margin: 4px 0;
+    }
+    .matchRowGroup.expanded .matchRow:hover { background: transparent; }
+    .matchDetailLine { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+    .matchDetailLabel { color: var(--text-dim); flex-shrink: 0; }
+    .matchDetailValue { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
     #status {
       margin-top: 10px;
       font-size: 12px;

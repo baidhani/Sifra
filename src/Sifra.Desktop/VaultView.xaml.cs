@@ -526,6 +526,7 @@ public partial class VaultView : UserControl
             ContextEditItem.Visibility = Visibility.Collapsed;
             ContextSetTagsItem.Visibility = Visibility.Collapsed;
             ContextFavoriteItem.Visibility = Visibility.Collapsed;
+            ContextAutofillItem.Visibility = Visibility.Collapsed;
             // Duplicate, Copy as Text, and Export are all read-only with
             // respect to the original item — Duplicate creates a brand-new
             // credential rather than modifying this one, so Lock (which
@@ -551,6 +552,8 @@ public partial class VaultView : UserControl
         ContextSetTagsItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextFavoriteItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         ContextFavoriteItem.Header = row.IsFavorite ? "Remove from Favorites" : "Add to Favorites";
+        ContextAutofillItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
+        ContextAutofillItem.Header = row.IsAutofillEnabled ? "Disable browser auto-fill" : "Enable browser auto-fill";
         ContextDuplicateItem.Visibility = isTrashed ? Visibility.Collapsed : Visibility.Visible;
         // Read-only actions — available regardless of trashed/locked state.
         ContextCopyAsTextItem.Visibility = Visibility.Visible;
@@ -645,6 +648,17 @@ public partial class VaultView : UserControl
         }
 
         _services.Credentials.SetFavorite(row.Id, !row.IsFavorite);
+        TryRefresh(row.Id);
+    }
+
+    private void OnContextToggleAutofillClick(object sender, RoutedEventArgs e)
+    {
+        if (_contextMenuRow is not { } row)
+        {
+            return;
+        }
+
+        _services.Credentials.SetAutofillEnabled(row.Id, !row.IsAutofillEnabled);
         TryRefresh(row.Id);
     }
 

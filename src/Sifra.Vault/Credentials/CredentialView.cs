@@ -19,4 +19,5 @@ public sealed record CredentialView(
     bool IsArchived = false,
     bool IsDeleted = false,
     DateTimeOffset? DeletedAtUtc = null,
-    bool IsLocked = false);
+    bool IsLocked = false,
+    bool IsAutofillEnabled = false);

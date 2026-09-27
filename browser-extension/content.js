@@ -38,6 +38,26 @@
       // toolbar badge (see background.js) and picked/filled from the popup —
       // no in-page banner for that case any more.
     });
+
+    // Unattended auto-fill — a no-op unless exactly one credential is
+    // marked "Enable auto-fill" for this domain (see background.js/
+    // CredentialAutofillService.GetAutofillTarget). Deliberately fires
+    // alongside DISCOVER rather than replacing it: DISCOVER still needs to
+    // run for the badge/manual picker regardless of whether anything is
+    // marked for auto-fill.
+    chrome.runtime.sendMessage({ type: "AUTOFILL", url: location.href }, (response) => {
+      if (!response || !response.ok) return; // not eligible, locked, or an error — leave the page as-is
+      setNativeInputValue(passwordInput, response.password);
+      passwordInput.dispatchEvent(new Event("input", { bubbles: true }));
+      passwordInput.dispatchEvent(new Event("change", { bubbles: true }));
+
+      const usernameInputForAutofill = findUsernameInput(passwordInput);
+      if (usernameInputForAutofill) {
+        setNativeInputValue(usernameInputForAutofill, response.username);
+        usernameInputForAutofill.dispatchEvent(new Event("input", { bubbles: true }));
+        usernameInputForAutofill.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
   }
 
   // Capture-on-submit, prompt-on-next-page-load (same pattern Chrome/

@@ -46,6 +46,7 @@ public sealed class CredentialRow : INotifyPropertyChanged
         IsDeleted = view.IsDeleted;
         DeletedAtUtc = view.DeletedAtUtc;
         IsLocked = view.IsLocked;
+        IsAutofillEnabled = view.IsAutofillEnabled;
         Tags = view.Tags ?? Array.Empty<string>();
         FieldValues = view.Fields.Select(f => f.Value).ToList();
 
@@ -167,6 +168,7 @@ public sealed class CredentialRow : INotifyPropertyChanged
     public bool IsDeleted { get; }
     public DateTimeOffset? DeletedAtUtc { get; }
     public bool IsLocked { get; }
+    public bool IsAutofillEnabled { get; }
     /// <summary>Whether this session has temporarily unlocked this item (see VaultView._sessionUnlockedIds) — passed in at construction since rows are rebuilt fresh on every Refresh.</summary>
     public bool IsSessionUnlocked { get; }
     public Visibility LockVisibility => IsLocked ? Visibility.Visible : Visibility.Collapsed;

@@ -192,6 +192,78 @@ public sealed class CredentialAutofillServiceTests : IDisposable
     }
 
     [Fact]
+    public void GetAutofillTarget_WithExactlyOneEnabledMatch_ReturnsIt()
+    {
+        // Acceptance: a single credential marked for auto-fill on this domain is returned.
+        var credentials = CreateCredentialService();
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"),
+            isAutofillEnabled: true);
+        var service = CreateServiceOn(credentials);
+
+        var target = service.GetAutofillTarget(VaultCredential, "https://github.com/login");
+
+        Assert.NotNull(target);
+        Assert.Equal(id, target!.Id);
+    }
+
+    [Fact]
+    public void GetAutofillTarget_WithNoEnabledMatch_ReturnsNull()
+    {
+        // A matching credential exists but isn't marked for auto-fill — no silent auto-fill.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        var service = CreateServiceOn(credentials);
+
+        Assert.Null(service.GetAutofillTarget(VaultCredential, "https://github.com/login"));
+    }
+
+    [Fact]
+    public void SetAutofillEnabled_ForACredentialOnThisDomain_TakesEffectImmediately()
+    {
+        // Acceptance: the extension can flip this flag directly, saved immediately.
+        var credentials = CreateCredentialService();
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        var service = CreateServiceOn(credentials);
+        Assert.Null(service.GetAutofillTarget(VaultCredential, "https://github.com/login"));
+
+        service.SetAutofillEnabled(VaultCredential, id, "https://github.com/login", true);
+
+        var target = service.GetAutofillTarget(VaultCredential, "https://github.com/login");
+        Assert.NotNull(target);
+        Assert.Equal(id, target!.Id);
+    }
+
+    [Fact]
+    public void SetAutofillEnabled_ForACredentialFromADifferentDomain_ThrowsDomainMismatch()
+    {
+        // Failure path: a page can't toggle auto-fill on some other site's credential
+        // just by knowing its id — same protection FillCredential already has.
+        var credentials = CreateCredentialService();
+        var id = credentials.Add(VaultCredential, "GitHub", LoginFields("firas", "hunter2", "https://github.com"));
+        var service = CreateServiceOn(credentials);
+
+        Assert.Throws<CredentialDomainMismatchException>(
+            () => service.SetAutofillEnabled(VaultCredential, id, "https://evil.example.com/login", true));
+    }
+
+    [Fact]
+    public void GetAutofillTarget_WithTwoEnabledMatchesForTheSameDomain_ReturnsNullRatherThanGuessing()
+    {
+        // Failure path being guarded against: two real accounts on the same
+        // site both marked for auto-fill must never be silently resolved by
+        // picking one — that's exactly the "filled the wrong account with
+        // no visible signal" scenario auto-fill must avoid.
+        var credentials = CreateCredentialService();
+        credentials.Add(VaultCredential, "GitHub work", LoginFields("firas-work", "hunter2", "https://github.com"),
+            isAutofillEnabled: true);
+        credentials.Add(VaultCredential, "GitHub personal", LoginFields("firas-personal", "hunter3", "https://github.com"),
+            isAutofillEnabled: true);
+        var service = CreateServiceOn(credentials);
+
+        Assert.Null(service.GetAutofillTarget(VaultCredential, "https://github.com/login"));
+    }
+
+    [Fact]
     public void CheckCapturedLogin_ForAnUnknownUsername_ReportsNew()
     {
         // Acceptance: a username not in the vault is offered as "save new".

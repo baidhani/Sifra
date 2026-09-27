@@ -244,6 +244,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Unattended auto-fill: content.js calls this on every page load with a
+  // password field, alongside DISCOVER. Deliberately silent when locked —
+  // per the user's own call, auto-fill must never itself prompt for the
+  // master password; it only ever fires when the vault is already unlocked
+  // for this browser session, same as the existing "needs unlock" toast
+  // already covers the locked case passively.
+  if (message.type === "AUTOFILL") {
+    getVaultPassword().then((vaultPassword) => {
+      if (!vaultPassword) {
+        sendResponse({ ok: false });
+        return;
+      }
+      sendDeviceRequest("autofill", { vaultCredential: vaultPassword, url: message.url }).then(sendResponse);
+    });
+    return true;
+  }
+
+  // Popup's auto-fill toggle — flips IsAutofillEnabled directly from the
+  // extension, saved immediately, no separate save step.
+  if (message.type === "SET_AUTOFILL") {
+    getVaultPassword().then((vaultPassword) => {
+      if (!vaultPassword) {
+        sendResponse({ ok: false, needsUnlock: true });
+        return;
+      }
+      sendDeviceRequest("set-autofill", {
+        vaultCredential: vaultPassword,
+        url: message.url,
+        credentialId: message.credentialId,
+        enabled: message.enabled,
+      }).then(sendResponse);
+    });
+    return true;
+  }
+
   // content.js calls this right after a login form is submitted (before
   // navigation actually happens), capturing what was typed for the *next*
   // page load in this same tab to check (see CHECK_PENDING_CAPTURE).

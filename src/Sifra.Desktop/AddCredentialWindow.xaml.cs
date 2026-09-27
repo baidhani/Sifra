@@ -66,6 +66,7 @@ public partial class AddCredentialWindow : Wpf.Ui.Controls.FluentWindow
         _selectedTags = existing.Tags?.ToList() ?? new List<string>();
         UpdateTagsSummary();
         FavoriteCheckBox.IsChecked = existing.IsFavorite;
+        AutofillCheckBox.IsChecked = existing.IsAutofillEnabled;
 
         // Replace the seeded default fields with the credential's real
         // ones, pulling the "Notes" field (if any) out into its own tab
@@ -131,6 +132,7 @@ public partial class AddCredentialWindow : Wpf.Ui.Controls.FluentWindow
         ErrorText.Text = string.Empty;
         var label = LabelBox.Text.Trim();
         var isFavorite = FavoriteCheckBox.IsChecked == true;
+        var isAutofillEnabled = AutofillCheckBox.IsChecked == true;
         var tags = _selectedTags;
         var fields = _fields
             .Where(f => f.Name.Trim().Length > 0)
@@ -151,12 +153,12 @@ public partial class AddCredentialWindow : Wpf.Ui.Controls.FluentWindow
         string id;
         if (_editingCredentialId is null)
         {
-            id = _services.Credentials.Add(_vaultCredential, label, fields, isFavorite, tags);
+            id = _services.Credentials.Add(_vaultCredential, label, fields, isFavorite, tags, isAutofillEnabled);
         }
         else
         {
             id = _editingCredentialId;
-            _services.Credentials.Edit(_vaultCredential, id, label, fields, isFavorite, tags);
+            _services.Credentials.Edit(_vaultCredential, id, label, fields, isFavorite, tags, isAutofillEnabled);
         }
 
         await AutoFetchWebsiteIconIfNeededAsync(id, fields);

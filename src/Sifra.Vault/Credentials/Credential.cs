@@ -32,6 +32,15 @@ namespace Sifra.Vault.Credentials;
 /// re-authenticate-to-unlock flow) is deliberately a Desktop UI concern,
 /// not this service's — see CredentialService's own remarks on having no
 /// persistent session state by design.
+///
+/// IsAutofillEnabled opts a credential into the browser extension's
+/// unattended auto-fill (fills on page load once the vault is already
+/// unlocked, no click needed) rather than the default click-to-fill picker.
+/// CredentialAutofillService.GetAutofillTarget only ever returns a match
+/// when exactly one enabled credential matches a page's domain — if two are
+/// both marked for the same site, auto-fill silently guessing between two
+/// real accounts is worse than not auto-filling at all, so it falls back to
+/// the manual picker instead of picking one arbitrarily.
 /// </summary>
 public sealed record Credential(
     string Id,
@@ -45,4 +54,5 @@ public sealed record Credential(
     bool IsArchived = false,
     bool IsDeleted = false,
     DateTimeOffset? DeletedAtUtc = null,
-    bool IsLocked = false);
+    bool IsLocked = false,
+    bool IsAutofillEnabled = false);

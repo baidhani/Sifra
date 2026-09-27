@@ -72,7 +72,7 @@ public sealed class CredentialService
 
     public string Add(
         string vaultCredential, string label, IReadOnlyList<(string Name, string Value, CustomFieldType Type)> fields,
-        bool isFavorite = false, IReadOnlyList<string>? tags = null)
+        bool isFavorite = false, IReadOnlyList<string>? tags = null, bool isAutofillEnabled = false)
     {
         var key = _encryption.DeriveKey(vaultCredential);
         var id = Guid.NewGuid().ToString("N");
@@ -85,7 +85,8 @@ public sealed class CredentialService
             now,
             now,
             IsFavorite: isFavorite,
-            Tags: tags));
+            Tags: tags,
+            IsAutofillEnabled: isAutofillEnabled));
 
         _auditLogger?.Log(nameof(Add), Environment.UserName, details: $"id={id}");
         return id;
@@ -94,7 +95,7 @@ public sealed class CredentialService
     /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
     public void Edit(
         string vaultCredential, string id, string label, IReadOnlyList<(string Name, string Value, CustomFieldType Type)> fields,
-        bool isFavorite = false, IReadOnlyList<string>? tags = null)
+        bool isFavorite = false, IReadOnlyList<string>? tags = null, bool? isAutofillEnabled = null)
     {
         var existing = FindOrThrow(id);
         var key = _encryption.DeriveKey(vaultCredential);
@@ -134,7 +135,12 @@ public sealed class CredentialService
             IsArchived: existing.IsArchived,
             IsDeleted: existing.IsDeleted,
             DeletedAtUtc: existing.DeletedAtUtc,
-            IsLocked: existing.IsLocked));
+            IsLocked: existing.IsLocked,
+            // Nullable, unlike isFavorite: existing callers (e.g. the
+            // extension's captured-password update flow) don't know or care
+            // about this flag and must not silently reset it to false just
+            // by not passing it — null means "leave it exactly as it was."
+            IsAutofillEnabled: isAutofillEnabled ?? existing.IsAutofillEnabled));
 
         _auditLogger?.Log(nameof(Edit), Environment.UserName, details: $"id={id}");
     }
@@ -385,6 +391,21 @@ public sealed class CredentialService
     }
 
     /// <summary>
+    /// Toggles IsAutofillEnabled without needing every other field — same
+    /// pattern as SetFavorite. See Credential's own remarks: this only
+    /// takes effect for the browser extension's auto-fill-on-page-load path
+    /// when it's the single enabled match for a page's domain — enabling it
+    /// on two credentials for the same site just means neither auto-fills.
+    /// </summary>
+    /// <exception cref="CredentialNotFoundException">No credential exists with this id.</exception>
+    public void SetAutofillEnabled(string id, bool isAutofillEnabled)
+    {
+        var record = FindOrThrow(id);
+        _store.Upsert(record with { IsAutofillEnabled = isAutofillEnabled, UpdatedAtUtc = DateTimeOffset.UtcNow });
+        _auditLogger?.Log(nameof(SetAutofillEnabled), Environment.UserName, details: $"id={id} isAutofillEnabled={isAutofillEnabled}");
+    }
+
+    /// <summary>
     /// Moves a credential to Trash — sets IsDeleted/DeletedAtUtc without
     /// touching anything else, so it's fully recoverable via Restore. This
     /// is what the normal Delete action in the UI calls; it does NOT
@@ -470,7 +491,8 @@ public sealed class CredentialService
         IsArchived: record.IsArchived,
         IsDeleted: record.IsDeleted,
         DeletedAtUtc: record.DeletedAtUtc,
-        IsLocked: record.IsLocked);
+        IsLocked: record.IsLocked,
+        IsAutofillEnabled: record.IsAutofillEnabled);
 
     /// <summary>
     /// Stamps each field with the current edit time, except a field whose

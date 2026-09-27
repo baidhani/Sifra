@@ -82,6 +82,47 @@ public sealed class CredentialAutofillService
     }
 
     /// <summary>
+    /// Lets the browser extension itself flip IsAutofillEnabled, without
+    /// going to Sifra Desktop — same domain-ownership check as
+    /// FillCredential (a caller cannot toggle an unrelated domain's
+    /// credential just by knowing its id), since this is reachable directly
+    /// from an untrusted page's extension popup rather than Desktop's own
+    /// already-scoped credential list.
+    /// </summary>
+    /// <exception cref="CredentialDomainMismatchException">The credential does not belong to this URL's domain.</exception>
+    public void SetAutofillEnabled(string vaultCredential, string credentialId, string url, bool enabled)
+    {
+        var offered = OfferCredentialsForUrlWithoutLogging(vaultCredential, url);
+        if (!offered.Any(c => c.Id == credentialId))
+        {
+            _auditLogger?.Log(nameof(SetAutofillEnabled), Environment.UserName, details: $"id={credentialId} outcome=domain_mismatch");
+            throw new CredentialDomainMismatchException(credentialId, url);
+        }
+
+        _credentials.SetAutofillEnabled(credentialId, enabled);
+        _auditLogger?.Log(nameof(SetAutofillEnabled), Environment.UserName, details: $"id={credentialId} enabled={enabled}");
+    }
+
+    /// <summary>
+    /// The browser extension's unattended auto-fill path: returns a
+    /// credential only when it is the single one, among this page's
+    /// domain matches, with IsAutofillEnabled set — never guesses between
+    /// two enabled matches (see Credential's own remarks on why). Returns
+    /// null for "not exactly one," which the caller treats identically to
+    /// "no auto-fill" — it doesn't distinguish zero from ambiguous, since
+    /// both fall back to the same manual click-to-fill picker.
+    /// </summary>
+    public CredentialView? GetAutofillTarget(string vaultCredential, string url)
+    {
+        var host = GetHost(url);
+        var enabledMatches = _credentials.List(vaultCredential)
+            .Where(c => HasMatchingWebsiteField(c, host) && c.IsAutofillEnabled)
+            .ToList();
+
+        return enabledMatches.Count == 1 ? enabledMatches[0] : null;
+    }
+
+    /// <summary>
     /// Compares a just-submitted username/password against what's already
     /// saved for this page's domain, so the caller (the browser extension)
     /// can offer to save a brand-new login or update a changed password —

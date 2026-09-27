@@ -203,6 +203,15 @@ public partial class CredentialDetailView : UserControl
                 : (System.Windows.Media.Brush)FindResource("Sifra.TextSecondaryBrush"),
         };
 
+        AutofillButton.ToolTip = c.IsAutofillEnabled ? "Disable browser auto-fill" : "Enable browser auto-fill";
+        AutofillButton.Icon = new Wpf.Ui.Controls.SymbolIcon
+        {
+            Symbol = Wpf.Ui.Controls.SymbolRegular.PlugConnected24,
+            Foreground = c.IsAutofillEnabled
+                ? (System.Windows.Media.Brush)FindResource("Sifra.Brand.PrimaryBrush")
+                : (System.Windows.Media.Brush)FindResource("Sifra.TextSecondaryBrush"),
+        };
+
         var tags = c.Tags ?? Array.Empty<string>();
         TagsPanel.Visibility = tags.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         // A tag missing from the registry (e.g. added via the CLI) has no
@@ -722,6 +731,14 @@ public partial class CredentialDetailView : UserControl
     {
         if (_current is null || !IsUnlockedForModification()) return;
         _services.Credentials.SetFavorite(_current.Id, !_current.IsFavorite);
+        ShowCredential(_current.Id);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnAutofillClick(object sender, RoutedEventArgs e)
+    {
+        if (_current is null || !IsUnlockedForModification()) return;
+        _services.Credentials.SetAutofillEnabled(_current.Id, !_current.IsAutofillEnabled);
         ShowCredential(_current.Id);
         Changed?.Invoke(this, EventArgs.Empty);
     }

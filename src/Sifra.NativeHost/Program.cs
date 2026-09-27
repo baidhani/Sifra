@@ -64,6 +64,9 @@ static string LoginValue(CredentialView view) =>
 static string PasswordValue(CredentialView view) =>
     view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Password)?.Value ?? string.Empty;
 
+static string WebsiteValue(CredentialView view) =>
+    view.Fields.FirstOrDefault(f => f.Type == CustomFieldType.Website)?.Value ?? string.Empty;
+
 static byte[]? ReadExactly(Stream stream, int count)
 {
     var buffer = new byte[count];
@@ -157,7 +160,19 @@ static string HandleRequest(
             case "discover":
                 var discoverUrl = root.GetProperty("url").GetString()!;
                 var offered = autofillService.OfferCredentialsForUrl(vaultCredential, discoverUrl);
-                var payload = offered.Select(c => new { id = c.Id, label = c.Label, username = LoginValue(c) });
+                // website/updatedAt are non-sensitive metadata (unlike
+                // username/password, never gated behind a FILL/consent
+                // round trip) — included here so the popup's "show details"
+                // toggle can display them without a second request.
+                var payload = offered.Select(c => new
+                {
+                    id = c.Id,
+                    label = c.Label,
+                    username = LoginValue(c),
+                    website = WebsiteValue(c),
+                    updatedAt = c.UpdatedAtUtc,
+                    autofillEnabled = c.IsAutofillEnabled,
+                });
                 return JsonSerializer.Serialize(new { ok = true, credentials = payload });
 
             case "fill":
@@ -166,6 +181,33 @@ static string HandleRequest(
                 var consent = root.GetProperty("consent").GetBoolean();
                 var view = autofillService.FillCredential(vaultCredential, credentialId, fillUrl, consent);
                 return JsonSerializer.Serialize(new { ok = true, username = LoginValue(view), password = PasswordValue(view) });
+
+            // Unattended auto-fill: only ever returns data when exactly one
+            // credential is marked IsAutofillEnabled for this page's domain
+            // (see GetAutofillTarget's own remarks on why ambiguous matches
+            // fall back to "no auto-fill" rather than guessing). Marking a
+            // credential for auto-fill IS the user's standing consent for
+            // it, so this still goes through FillCredential's own
+            // consent-gated path (consentGranted: true) rather than a
+            // separate unaudited read — same audit trail as a manual fill.
+            case "autofill":
+                var autofillUrl = root.GetProperty("url").GetString()!;
+                var autofillTarget = autofillService.GetAutofillTarget(vaultCredential, autofillUrl);
+                if (autofillTarget is null)
+                {
+                    return JsonSerializer.Serialize(new { ok = false });
+                }
+                var autofilled = autofillService.FillCredential(vaultCredential, autofillTarget.Id, autofillUrl, consentGranted: true);
+                return JsonSerializer.Serialize(new { ok = true, username = LoginValue(autofilled), password = PasswordValue(autofilled) });
+
+            // Lets the popup toggle a card's auto-fill flag directly,
+            // instead of only being settable from Sifra Desktop.
+            case "set-autofill":
+                var setAutofillUrl = root.GetProperty("url").GetString()!;
+                var setAutofillCredentialId = root.GetProperty("credentialId").GetString()!;
+                var setAutofillEnabled = root.GetProperty("enabled").GetBoolean();
+                autofillService.SetAutofillEnabled(vaultCredential, setAutofillCredentialId, setAutofillUrl, setAutofillEnabled);
+                return JsonSerializer.Serialize(new { ok = true });
 
             // Save-password-prompt flow: the extension captures a submitted
             // login form, then (after the resulting page loads) asks here

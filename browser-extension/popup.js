@@ -78,6 +78,13 @@ const COPY_USERNAME_ICON =
   '<svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.9"/><path d="M4 16c0-3 2.7-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
 const COPY_PASSWORD_ICON =
   '<svg width="17" height="17" viewBox="0 0 20 20" fill="none"><circle cx="7" cy="10" r="3" stroke="currentColor" stroke-width="1.9"/><path d="M9.8 10h7.2M13.5 10v3M16 10v2" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+const DETAILS_ICON =
+  '<svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// A lightning-bolt marker next to the label — the only visible sign, before
+// expanding details, that this specific card is the one that'll silently
+// fill itself on page load rather than needing a click.
+const AUTOFILL_ICON =
+  '<svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M11 2 4 12h5l-1 6 7-10h-5l1-6Z"/></svg>';
 
 function makeCopyButton(title, icon, onClick) {
   const button = document.createElement("button");
@@ -106,15 +113,28 @@ function renderMatches(credentials, tabId, tabUrl) {
     main.type = "button";
     main.className = "matchMain";
 
+    const labelRow = document.createElement("span");
+    labelRow.className = "matchLabelRow";
+
     const label = document.createElement("span");
     label.className = "matchLabel";
     label.textContent = cred.label;
+    labelRow.appendChild(label);
+
+    // Always created (not just when enabled) so the toggle button below can
+    // show/hide it in place after a successful toggle without a full re-render.
+    const autofillBadge = document.createElement("span");
+    autofillBadge.className = "autofillBadge";
+    autofillBadge.title = "Auto-fills automatically on this site";
+    autofillBadge.innerHTML = AUTOFILL_ICON;
+    autofillBadge.hidden = !cred.autofillEnabled;
+    labelRow.appendChild(autofillBadge);
 
     const username = document.createElement("span");
     username.className = "matchUsername" + (cred.username ? "" : " empty");
     username.textContent = cred.username || "No username saved";
 
-    main.append(label, username);
+    main.append(labelRow, username);
     main.addEventListener("click", () => {
       chrome.tabs.sendMessage(tabId, { type: "FILL_FROM_POPUP", credential: cred }, () => {
         // "Could not establish connection. Receiving end does not exist" —
@@ -153,9 +173,101 @@ function renderMatches(credentials, tabId, tabUrl) {
       });
     });
 
-    row.append(main, copyUsernameButton, copyPasswordButton);
-    matchesList.appendChild(row);
+    // A lightweight alternative to a full separate "card details" screen
+    // (considered and deliberately not built, 2026-09-23 — too much surface
+    // for a 260px popup, and it'd duplicate Sifra Desktop's own detail view):
+    // an inline expand/collapse toggle showing the two extra fields DISCOVER
+    // already returns (website, last-updated) without any extra round trip.
+    const detailsPanel = document.createElement("div");
+    detailsPanel.className = "matchDetails";
+    detailsPanel.hidden = true;
+    detailsPanel.append(
+      makeDetailLine("Website", cred.website || "—"),
+      makeDetailLine("Last updated", formatUpdatedAt(cred.updatedAt)),
+      makeDetailLine("Auto-fill", cred.autofillEnabled ? "Enabled" : "Disabled")
+    );
+
+    const rowGroup = document.createElement("div");
+    rowGroup.className = "matchRowGroup";
+
+    const detailsToggle = document.createElement("button");
+    detailsToggle.type = "button";
+    detailsToggle.className = "copyButton";
+    detailsToggle.title = "Show details";
+    detailsToggle.setAttribute("aria-label", "Show details");
+    detailsToggle.innerHTML = DETAILS_ICON;
+    detailsToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      detailsPanel.hidden = !detailsPanel.hidden;
+      const isExpanded = !detailsPanel.hidden;
+      // The toggle button itself stays visible while its panel is open,
+      // even after the mouse leaves the row — otherwise the only way to
+      // collapse it again is to hover back over the row first to make the
+      // (now-invisible) toggle reappear. rowGroup gets the matching
+      // "expanded" class so the whole card (see CSS) reads as visually
+      // distinct from the rest of the list, not just the chevron itself.
+      detailsToggle.classList.toggle("expanded", isExpanded);
+      rowGroup.classList.toggle("expanded", isExpanded);
+      detailsToggle.style.transform = isExpanded ? "rotate(180deg)" : "";
+      detailsToggle.title = isExpanded ? "Hide details" : "Show details";
+    });
+
+    // Toggles IsAutofillEnabled directly from the popup, saved immediately
+    // (SET_AUTOFILL) — no separate save step, matching the copy buttons'
+    // one-click-and-done pattern. Blue/filled when on, dim/outline when
+    // off, so its own state is visible without needing the passive label
+    // badge or the details panel.
+    const autofillToggle = document.createElement("button");
+    autofillToggle.type = "button";
+    autofillToggle.className = "copyButton" + (cred.autofillEnabled ? " autofillOn" : "");
+    autofillToggle.title = cred.autofillEnabled ? "Disable auto-fill" : "Enable auto-fill";
+    autofillToggle.setAttribute("aria-label", autofillToggle.title);
+    autofillToggle.innerHTML = AUTOFILL_ICON;
+    autofillToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const nextEnabled = !cred.autofillEnabled;
+      autofillToggle.disabled = true;
+      chrome.runtime.sendMessage(
+        { type: "SET_AUTOFILL", url: tabUrl, credentialId: cred.id, enabled: nextEnabled },
+        (response) => {
+          autofillToggle.disabled = false;
+          if (!response || !response.ok) {
+            setStatus("Couldn't change auto-fill.", "error");
+            return;
+          }
+          cred.autofillEnabled = nextEnabled;
+          autofillToggle.classList.toggle("autofillOn", nextEnabled);
+          autofillToggle.title = nextEnabled ? "Disable auto-fill" : "Enable auto-fill";
+          autofillToggle.setAttribute("aria-label", autofillToggle.title);
+          autofillBadge.hidden = !nextEnabled;
+          setStatus(nextEnabled ? "Auto-fill enabled." : "Auto-fill disabled.", "success");
+        }
+      );
+    });
+
+    row.append(main, copyUsernameButton, copyPasswordButton, autofillToggle, detailsToggle);
+    rowGroup.append(row, detailsPanel);
+    matchesList.appendChild(rowGroup);
   }
+}
+
+function makeDetailLine(label, value) {
+  const line = document.createElement("div");
+  line.className = "matchDetailLine";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "matchDetailLabel";
+  labelSpan.textContent = label;
+  const valueSpan = document.createElement("span");
+  valueSpan.className = "matchDetailValue";
+  valueSpan.textContent = value;
+  line.append(labelSpan, valueSpan);
+  return line;
+}
+
+function formatUpdatedAt(isoString) {
+  if (!isoString) return "—";
+  const date = new Date(isoString);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 chrome.runtime.sendMessage({ type: "STATUS" }, (response) => {

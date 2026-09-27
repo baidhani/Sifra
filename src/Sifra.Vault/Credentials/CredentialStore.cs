@@ -62,8 +62,8 @@ public sealed class CredentialStore
             {
                 cmd.Transaction = transaction;
                 cmd.CommandText = exists
-                    ? "UPDATE credentials SET label=$label, updated_at=$updated, created_at=$created, is_favorite=$fav, icon_kind=$iconKind, icon_symbol_name=$iconSymbol, icon_background_color_hex=$iconColor, is_archived=$archived, is_deleted=$deleted, deleted_at=$deletedAt, is_locked=$locked WHERE id=$id"
-                    : "INSERT INTO credentials (id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked) VALUES ($id, $label, $updated, $created, $fav, $iconKind, $iconSymbol, $iconColor, $archived, $deleted, $deletedAt, $locked)";
+                    ? "UPDATE credentials SET label=$label, updated_at=$updated, created_at=$created, is_favorite=$fav, icon_kind=$iconKind, icon_symbol_name=$iconSymbol, icon_background_color_hex=$iconColor, is_archived=$archived, is_deleted=$deleted, deleted_at=$deletedAt, is_locked=$locked, is_autofill_enabled=$autofill WHERE id=$id"
+                    : "INSERT INTO credentials (id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked, is_autofill_enabled) VALUES ($id, $label, $updated, $created, $fav, $iconKind, $iconSymbol, $iconColor, $archived, $deleted, $deletedAt, $locked, $autofill)";
                 cmd.Parameters.AddWithValue("$id", credential.Id);
                 cmd.Parameters.AddWithValue("$label", credential.Label);
                 cmd.Parameters.AddWithValue("$updated", credential.UpdatedAtUtc.ToString("o"));
@@ -76,6 +76,7 @@ public sealed class CredentialStore
                 cmd.Parameters.AddWithValue("$deleted", credential.IsDeleted ? 1 : 0);
                 cmd.Parameters.AddWithValue("$deletedAt", (object?)credential.DeletedAtUtc?.ToString("o") ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("$locked", credential.IsLocked ? 1 : 0);
+                cmd.Parameters.AddWithValue("$autofill", credential.IsAutofillEnabled ? 1 : 0);
                 cmd.ExecuteNonQuery();
             }
 
@@ -174,7 +175,7 @@ public sealed class CredentialStore
 
         using (var cmd = connection.CreateCommand())
         {
-            cmd.CommandText = "SELECT id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked FROM credentials ORDER BY rowid";
+            cmd.CommandText = "SELECT id, label, updated_at, created_at, is_favorite, icon_kind, icon_symbol_name, icon_background_color_hex, is_archived, is_deleted, deleted_at, is_locked, is_autofill_enabled FROM credentials ORDER BY rowid";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
@@ -193,7 +194,8 @@ public sealed class CredentialStore
                     IsArchived: reader.GetInt32(8) == 1,
                     IsDeleted: reader.GetInt32(9) == 1,
                     DeletedAtUtc: reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
-                    IsLocked: reader.GetInt32(11) == 1);
+                    IsLocked: reader.GetInt32(11) == 1,
+                    IsAutofillEnabled: reader.GetInt32(12) == 1);
                 order.Add(id);
             }
         }
@@ -297,6 +299,7 @@ public sealed class CredentialStore
         AddColumnIfMissing(connection, "credentials", "is_deleted", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(connection, "credentials", "deleted_at", "TEXT");
         AddColumnIfMissing(connection, "credentials", "is_locked", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(connection, "credentials", "is_autofill_enabled", "INTEGER NOT NULL DEFAULT 0");
     }
 
     private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string definition)

@@ -313,6 +313,7 @@
                             <MenuItem x:Name="ContextEditItem" Header="Edit" Icon="{ui:SymbolIcon Edit24}" Click="OnContextEditClick"/>
                             <MenuItem x:Name="ContextSetTagsItem" Header="Set Tags..." Icon="{ui:SymbolIcon Tag24}" Click="OnContextSetTagsClick"/>
                             <MenuItem x:Name="ContextFavoriteItem" Icon="{ui:SymbolIcon Star24}" Click="OnContextToggleFavoriteClick"/>
+                            <MenuItem x:Name="ContextAutofillItem" Icon="{ui:SymbolIcon PlugConnected24}" Click="OnContextToggleAutofillClick"/>
                             <MenuItem x:Name="ContextDuplicateItem" Header="Duplicate" Icon="{ui:SymbolIcon Copy24}" Click="OnContextDuplicateClick"/>
                             <MenuItem x:Name="ContextCopyAsTextItem" Header="Copy as Text" Icon="{ui:SymbolIcon ClipboardTextLtr24}" Click="OnContextCopyAsTextClick"/>
                             <MenuItem x:Name="ContextExportItem" Header="Export..." Icon="{ui:SymbolIcon ArrowExportLtr24}" Click="OnContextExportClick"/>
